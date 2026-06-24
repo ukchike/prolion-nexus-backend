@@ -77,9 +77,58 @@ async function testPDF() {
   }
 }
 
+async function testAccessRealSample() {
+  console.log('\n--- Testing real Access Bank sample (RAL Paints, calibrated) ---')
+  const txtPath = path.join(__dirname, 'fixtures', 'access-real-sample.txt')
+
+  if (!fs.existsSync(txtPath)) {
+    console.log('  SKIP - fixture not found.')
+    return
+  }
+
+  const { parseAccessText } = require('../src/parsers/access')
+  const rawText = fs.readFileSync(txtPath, 'utf-8')
+  const result = parseAccessText(rawText)
+
+  console.log(`Parsed ${result.transactions.length} transactions, ${result.unparsedLines.length} unparsed lines`)
+
+  // 11 real transactions in this excerpt; "Opening Balance" correctly
+  // excluded; transaction #13 is genuinely truncated in this fixture
+  // (the source paste was cut off mid-block) so 1 unparsed line is expected.
+  check('extracted all 11 real transactions', result.transactions.length === 11)
+  check('exactly 1 unparsed line (the deliberately truncated final block)', result.unparsedLines.length === 1)
+
+  const first = result.transactions[0]
+  check('first transaction debit matches statement', first?.debit === 53.75)
+  check('first transaction balance matches statement', first?.balance === 6095767.87)
+  check('first transaction credit is null (not zero)', first?.credit === null)
+
+  // Transaction 8->9 is a credit (lodgement) — confirms debit/credit
+  // direction is read correctly, not just defaulted to debit.
+  const creditTxn = result.transactions.find((t) => t.credit !== null)
+  check('the one credit transaction was correctly identified as a credit', creditTxn?.credit === 2400000)
+  check('credit transaction balance matches statement', creditTxn?.balance === 4093160.37)
+
+  // Verify the balance chain is internally consistent — each balance
+  // should equal the previous balance minus debit plus credit. This
+  // catches sign/assignment errors that individual field checks might miss.
+  let runningBalance = 6095821.62 // the excluded Opening Balance
+  let chainConsistent = true
+  for (const t of result.transactions) {
+    const expected = runningBalance - (t.debit || 0) + (t.credit || 0)
+    if (Math.abs(expected - t.balance) > 0.01) {
+      chainConsistent = false
+      console.log(`  Chain break at "${t.description.slice(0, 40)}...": expected ${expected}, got ${t.balance}`)
+    }
+    runningBalance = t.balance
+  }
+  check('balance chain is internally consistent across all 11 transactions', chainConsistent)
+}
+
 async function main() {
   await testCSV()
   await testPDF()
+  await testAccessRealSample()
 
   console.log('\n=================================')
   if (failures === 0) {
