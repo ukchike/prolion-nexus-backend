@@ -1,0 +1,30 @@
+{
+  "name": "nexus-backend",
+  "version": "1.0.0",
+  "description": "Stateless bank-statement parsing service for NEXUS by Prolion",
+  "main": "src/server.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "test": "node test/parser.test.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "exceljs": "^4.4.0",
+    "express": "^5.2.1",
+    "multer": "^2.2.0",
+    "papaparse": "^5.5.4",
+    "pdf-parse": "^2.4.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14",
+    "pdfkit": "^0.19.1"
+  }
+}
