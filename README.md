@@ -8,19 +8,27 @@ only job is: file in, transactions out.
 
 ## Calibration notice
 
-The PDF parsers (`src/parsers/gtb.js`, `access.js`, `zenith.js`) were built
-from common Nigerian bank e-statement layout patterns, NOT from a real
-GTB/Access/Zenith export — none was available during development. They are
-verified working against synthetic test fixtures (see `test/`), but **must
-be validated against a real statement before being trusted for actual
-client financials.**
+**Access Bank is now calibrated against a real statement** (RAL Paints
+Ltd, June 2026) — see `src/parsers/access.js` for the full layout
+breakdown and `test/fixtures/access-real-sample.txt` /
+`test/parser.test.js` (testAccessRealSample) for the regression test.
+Access's layout turned out to be fundamentally different from GTB's —
+multi-line blocks rather than one line per transaction — which is why
+its parser is now a real, independent implementation rather than a
+GTB clone.
 
-If a real statement doesn't parse correctly, use the `rawTextPreview` field
-in the API response (or the "Show raw extracted text" button in the
-frontend) to see exactly what `pdf-parse` extracted, then adjust the
-relevant bank's parser file. The part most likely to need tuning is
-`assignAmounts()` in `gtb.js` — it decides which numbers on a line are
-debit/credit/balance.
+**GTB and Zenith are still uncalibrated** — built from common Nigerian
+e-statement layout patterns, verified only against synthetic test data.
+Test each against a real statement before trusting it, the same way
+Access just was. If a real GTB or Zenith statement turns out to use
+Access's multi-line block structure instead of single-line rows, copy
+the block-detection approach in `access.js` rather than starting from
+scratch.
+
+If a real statement doesn't parse correctly, use the `rawTextPreview`
+field in the API response (or the "Show raw extracted text" button in
+the frontend) to see exactly what `pdf-parse` extracted, then adjust
+the relevant bank's parser file.
 
 ## Setup
 
