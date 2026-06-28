@@ -49,8 +49,9 @@ Guidance:
 - Recognisable salary/payroll language is "Staff Salaries & Wages"
 - Recognisable tax authority references (FIRS, NRS, VAT, WHT, PAYE remittance) are "Tax Payments"
 - IMPORTANT accounting distinction — do not treat loan or drawing movements as income/expense:
-  - Money coming in described as a loan, facility drawdown, or overdraft drawdown is "Loan Received" (Balance Sheet), never "Sales Revenue" or "Other Income"
-  - Money going out to repay a loan's principal is "Loan Repayment - Principal" (Balance Sheet); only an explicitly-labelled interest portion is "Interest Expense" (P&L)
+  - Money coming in described as a loan, facility drawdown, or overdraft drawdown is "Loan Received - Current" or "Loan Received - Non-current" (Balance Sheet), never "Sales Revenue" or "Other Income"
+  - Money going out to repay a loan's principal is "Loan Repayment - Principal (Current)" or "Loan Repayment - Principal (Non-current)" (Balance Sheet); only an explicitly-labelled interest portion is "Interest Expense" (P&L)
+  - For the Current vs Non-current choice on loans: if the description mentions "overdraft", "short-term", or gives no term information at all, default to Current — that's the more common case for informal SME lending. Only use Non-current if the description clearly indicates a multi-year term (e.g. "term loan", "asset finance", "mortgage")
   - Money withdrawn by an owner/director for personal use (not a business expense, not payroll) is "Owner/Director Withdrawal" (Balance Sheet), never an expense category
   - Capital injected by an owner/shareholder is "Capital Introduced" (Balance Sheet), never income
 

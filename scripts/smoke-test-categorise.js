@@ -63,10 +63,14 @@ async function main() {
   }
 
   console.log('\nEyeball check: do these categories look right for each description above?')
-  console.log('Especially check #7, #8, #9 — these should ALL land in Balance Sheet')
-  console.log('(Loan Received, Loan Repayment - Principal, Owner/Director Withdrawal),')
-  console.log('NOT Income or Expense. That reclassification is the main thing this')
-  console.log('smoke test exists to verify.')
+  console.log('Especially check #7, #8, #9 — these should land in Balance Sheet:')
+  console.log('  #7 -> "Loan Received - Current" (no term stated, so Current is the right default)')
+  console.log('  #8 -> "Loan Repayment - Principal (Current)" (the combined principal+interest')
+  console.log('        description is genuinely ambiguous on splitting interest out — check')
+  console.log('        whether this needs a manual correction in the Review screen)')
+  console.log('  #9 -> "Owner/Director Withdrawal"')
+  console.log('None of these three should be Income or Expense. That reclassification is the')
+  console.log('main thing this smoke test exists to verify.')
   console.log('If something looks consistently wrong, the prompt in')
   console.log('src/lib/categorisationEngine.js (buildPrompt) is the place to adjust.')
 }
