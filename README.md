@@ -102,6 +102,34 @@ advisory (buffer bounds check, only relevant if `uuid` is called with a
 caller-supplied buffer — not how `exceljs` uses it internally). Run
 `npm audit` periodically and re-evaluate if `exceljs` ships an update.
 
+## Sprint 2: AI categorisation
+
+### `POST /api/categorise-transactions`
+Body: `{ "transactions": [{ "id", "description", "debit", "credit" }, ...] }`
+
+Sends transactions to Claude (Haiku, by default — see `src/lib/anthropicClient.js`
+for why) in batches of 40, asks it to assign one category per transaction
+from the fixed taxonomy in `src/lib/categoryTaxonomy.js`, and derives
+`category_group` deterministically from whatever category it picks
+(never trusts the model to report group and category consistently on
+its own). Unrecognised/hallucinated categories fall back to
+"Uncategorised" rather than breaking the database insert.
+
+Response: `{ results: [{id, category, category_group}], failedIds, batchErrors, totalProcessed, totalFailed }`
+
+**Setup**: add `ANTHROPIC_API_KEY` (from console.anthropic.com) to your
+`.env` locally and to Railway's environment variables when deployed.
+Without it, this endpoint returns a clear 500 error rather than failing
+silently.
+
+**Testing**: `node test/categorise.test.js` runs the prompt-building,
+response-parsing, validation, and batching logic against a MOCKED Claude
+response — no API key needed, no real cost. This is NOT a test of the
+live API call itself. For that, run `node scripts/smoke-test-categorise.js`
+after adding a real key — it makes one real (cheap) API call against 6
+sample transactions and prints the categories so you can eyeball whether
+they look right before trusting it on a real client statement.
+
 ## Deployment
 
 This is a long-running Node server — deploy to **Railway** or **Render**,

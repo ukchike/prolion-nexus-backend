@@ -42,9 +42,41 @@ const BALANCE_SHEET_CATEGORIES = [
   'Intercompany Transfer',
 ]
 
+const TRANSFER_CATEGORIES = ['Inter-account Transfer']
+
+// Deliberately small — this is a last-resort fallback for genuinely
+// ambiguous transactions, not a category to lean on. If the AI
+// categoriser is using this often, the prompt or category list needs
+// work, not this list.
+const UNCLASSIFIED_CATEGORIES = ['Uncategorised']
+
+const ALL_CATEGORIES = [
+  ...INCOME_CATEGORIES,
+  ...EXPENSE_CATEGORIES,
+  ...BALANCE_SHEET_CATEGORIES,
+  ...TRANSFER_CATEGORIES,
+  ...UNCLASSIFIED_CATEGORIES,
+]
+
+// Reverse lookup: given a specific category name, what group does it
+// belong to? Built once here rather than asked of the AI per-transaction,
+// so category_group can never be inconsistent with category (e.g. the AI
+// picking "Sales Revenue" but mistakenly tagging it EXPENSE) — group is
+// always derived deterministically from the chosen category.
+const CATEGORY_TO_GROUP = {}
+INCOME_CATEGORIES.forEach((c) => (CATEGORY_TO_GROUP[c] = CATEGORY_GROUPS.INCOME))
+EXPENSE_CATEGORIES.forEach((c) => (CATEGORY_TO_GROUP[c] = CATEGORY_GROUPS.EXPENSE))
+BALANCE_SHEET_CATEGORIES.forEach((c) => (CATEGORY_TO_GROUP[c] = CATEGORY_GROUPS.BALANCE_SHEET))
+TRANSFER_CATEGORIES.forEach((c) => (CATEGORY_TO_GROUP[c] = CATEGORY_GROUPS.TRANSFER))
+UNCLASSIFIED_CATEGORIES.forEach((c) => (CATEGORY_TO_GROUP[c] = CATEGORY_GROUPS.UNCLASSIFIED))
+
 module.exports = {
   CATEGORY_GROUPS,
   INCOME_CATEGORIES,
   EXPENSE_CATEGORIES,
   BALANCE_SHEET_CATEGORIES,
+  TRANSFER_CATEGORIES,
+  UNCLASSIFIED_CATEGORIES,
+  ALL_CATEGORIES,
+  CATEGORY_TO_GROUP,
 }
