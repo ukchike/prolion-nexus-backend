@@ -4,6 +4,13 @@
  * category_group (INCOME / EXPENSE / TRANSFER / UNCLASSIFIED) based on
  * debit/credit direction. The detailed AI categorisation (Sprint 2) will
  * assign the specific category within these groups.
+ *
+ * Revised after reviewing a real Nigerian SME Chart of Accounts
+ * framework (supplied by the user): three categories were reclassified
+ * from P&L into Balance Sheet, since they were technically misplaced —
+ * see the comments above BALANCE_SHEET_CATEGORIES for the reasoning.
+ * If this categorisation ever feeds a real FIRS computation, getting
+ * these placements right matters for more than just labelling.
  */
 
 const CATEGORY_GROUPS = {
@@ -18,8 +25,9 @@ const INCOME_CATEGORIES = [
   'Sales Revenue',
   'Service Income',
   'Rental Income',
-  'Loan Received',
   'Other Income',
+  // NOTE: 'Loan Received' deliberately NOT here — a loan is a liability
+  // increase, not revenue. See BALANCE_SHEET_CATEGORIES.
 ]
 
 const EXPENSE_CATEGORIES = [
@@ -31,14 +39,36 @@ const EXPENSE_CATEGORIES = [
   'Marketing & Advertising',
   'Professional Fees',
   'Tax Payments',
-  'Loan Repayment',
-  'Personal Withdrawal',
+  'Interest Expense',
   'Other Operating Expenses',
+  // NOTE: 'Loan Repayment' and 'Personal Withdrawal' deliberately NOT
+  // here — repaying loan principal reduces a liability (not a cost),
+  // and an owner/director drawing is an equity movement, not a
+  // deductible expense. Both moved to BALANCE_SHEET_CATEGORIES.
+  // 'Interest Expense' is new — it's the genuinely P&L-relevant part
+  // of a loan repayment, now split out so it has somewhere correct to go.
 ]
 
+// Expanded from 3 to 12 items after user feedback that this group was
+// too thin relative to Income/Expense. Reclassifications from P&L:
+// Loan Received (was Income), Loan Repayment Principal + Owner
+// Withdrawal (were Expense) — see notes above. New additions cover
+// asset, liability, and equity-side movements that can plausibly show
+// up as a single bank transaction line (deliberately excludes non-cash
+// period-end entries like depreciation, which never appear on a
+// statement).
 const BALANCE_SHEET_CATEGORIES = [
   'Capital Introduced',
+  'Owner/Director Withdrawal',
   'Asset Purchase',
+  'Asset Disposal Proceeds',
+  'Loan Received',
+  'Loan Repayment - Principal',
+  'Security Deposit Paid',
+  'Security Deposit Refund',
+  'Customer Advance / Deposit Received',
+  'Staff Loan Advanced',
+  'Staff Loan Repayment Received',
   'Intercompany Transfer',
 ]
 

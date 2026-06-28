@@ -24,6 +24,13 @@ const SAMPLE_TRANSACTIONS = [
   { id: '4', description: 'SMS ALERT CHARGE', debit: 4, credit: null },
   { id: '5', description: 'VAT PAYMENT FIRS', debit: 8500, credit: null },
   { id: '6', description: 'PP_RALPAINTS/Others/ACB /YAHAYA TAIGA HARUNA', debit: 4164000, credit: null },
+  // These three specifically test the Sprint 2 reclassification — if
+  // the prompt guidance isn't working, these will come back as Income/
+  // Expense instead of Balance Sheet, which is the exact bug being
+  // checked for here.
+  { id: '7', description: 'LOAN DISBURSEMENT FROM ACCESS BANK', debit: null, credit: 2000000 },
+  { id: '8', description: 'LOAN REPAYMENT - PRINCIPAL AND INTEREST', debit: 250000, credit: null },
+  { id: '9', description: 'WITHDRAWAL BY DIRECTOR - PERSONAL USE', debit: 100000, credit: null },
 ]
 
 async function main() {
@@ -56,6 +63,10 @@ async function main() {
   }
 
   console.log('\nEyeball check: do these categories look right for each description above?')
+  console.log('Especially check #7, #8, #9 — these should ALL land in Balance Sheet')
+  console.log('(Loan Received, Loan Repayment - Principal, Owner/Director Withdrawal),')
+  console.log('NOT Income or Expense. That reclassification is the main thing this')
+  console.log('smoke test exists to verify.')
   console.log('If something looks consistently wrong, the prompt in')
   console.log('src/lib/categorisationEngine.js (buildPrompt) is the place to adjust.')
 }
