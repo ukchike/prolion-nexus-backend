@@ -125,10 +125,46 @@ async function testAccessRealSample() {
   check('balance chain is internally consistent across all 11 transactions', chainConsistent)
 }
 
+async function testZenithRealSample() {
+  console.log('\n--- Testing real Zenith Bank sample (RAL Paints, calibrated) ---')
+  const txtPath = path.join(__dirname, 'fixtures', 'zenith-real-sample.txt')
+
+  if (!fs.existsSync(txtPath)) {
+    console.log('  SKIP - fixture not found.')
+    return
+  }
+
+  const { parseZenithText } = require('../src/parsers/zenith')
+  const rawText = fs.readFileSync(txtPath, 'utf-8')
+  const result = parseZenithText(rawText)
+
+  console.log(`Parsed ${result.transactions.length} transactions, ${result.unparsedLines.length} unparsed lines`)
+
+  check('extracted all 6 real transactions', result.transactions.length === 6)
+  check('zero unparsed lines', result.unparsedLines.length === 0)
+
+  const totalDebits = result.transactions.reduce((sum, t) => sum + (t.debit || 0), 0)
+  const totalCredits = result.transactions.reduce((sum, t) => sum + (t.credit || 0), 0)
+
+  // These exact figures come from the statement's own footer summary
+  // ("Total Debits: 5 ... NGN 6,405,365.78 Total Credits: 1 ... NGN 1,719,216.97")
+  // — matching them is a strong, independent check that we read every
+  // amount correctly, not just that the code ran without crashing.
+  check('total debits match the statement\'s own footer total', Math.abs(totalDebits - 6405365.78) < 0.01)
+  check('total credits match the statement\'s own footer total', Math.abs(totalCredits - 1719216.97) < 0.01)
+
+  const finalBalance = result.transactions[result.transactions.length - 1]?.balance
+  check('final balance matches statement\'s "Cleared Balance"', Math.abs(finalBalance - 735974.22) < 0.01)
+
+  const creditTxn = result.transactions.find((t) => t.credit !== null)
+  check('the one credit transaction was correctly identified (not as a debit)', creditTxn?.credit === 1719216.97 && creditTxn?.debit === null)
+}
+
 async function main() {
   await testCSV()
   await testPDF()
   await testAccessRealSample()
+  await testZenithRealSample()
 
   console.log('\n=================================')
   if (failures === 0) {
