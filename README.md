@@ -122,13 +122,31 @@ Response: `{ results: [{id, category, category_group}], failedIds, batchErrors, 
 Without it, this endpoint returns a clear 500 error rather than failing
 silently.
 
+**No funded Anthropic account yet?** Set `AI_PROVIDER=groq` and
+`GROQ_API_KEY` (free, no card required, from console.groq.com) instead —
+same endpoint, same response shape, just a different model underneath
+(Llama 3.3 70B via Groq instead of Claude Haiku). Switch back to Claude
+later by changing `AI_PROVIDER` back to `anthropic` (or removing it,
+since that's the default) — no code changes needed either way. See
+`src/lib/aiProvider.js` for the selection logic.
+
+One thing to watch for with Groq specifically: smaller/open-weight models
+tend to be chattier about wrapping JSON in explanatory text despite being
+told not to, more so than Claude. The response parser
+(`parseAIResponse` in `categorisationEngine.js`) has a fallback for this,
+but if categorisation quality looks off, check the raw response shape
+first before assuming the categories themselves are wrong.
+
 **Testing**: `node test/categorise.test.js` runs the prompt-building,
-response-parsing, validation, and batching logic against a MOCKED Claude
-response — no API key needed, no real cost. This is NOT a test of the
-live API call itself. For that, run `node scripts/smoke-test-categorise.js`
-after adding a real key — it makes one real (cheap) API call against 6
-sample transactions and prints the categories so you can eyeball whether
-they look right before trusting it on a real client statement.
+response-parsing, validation, batching, and provider-selection logic
+against MOCKED responses — no API key needed, no real cost. This is NOT
+a test of the live API call itself. For that, run
+`node scripts/smoke-test-categorise.js` after adding a real key for
+whichever provider you've configured — it makes one real (cheap or free,
+depending on provider) API call against 9 sample transactions and prints
+the categories so you can eyeball whether they look right, including the
+3 specifically testing the Balance Sheet reclassification (loan
+received/repayment, owner withdrawal).
 
 ## Deployment
 

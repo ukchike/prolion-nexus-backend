@@ -1,6 +1,6 @@
 const express = require('express')
 const { categoriseTransactions, MAX_TRANSACTIONS_PER_REQUEST } = require('../lib/categorisationEngine')
-const { callClaude } = require('../lib/anthropicClient')
+const { getProvider } = require('../lib/aiProvider')
 
 const router = express.Router()
 
@@ -13,14 +13,25 @@ const router = express.Router()
  * transactions to send here, and for writing ai_category/category_group
  * back to the database once it gets a response.
  *
+ * Which AI provider actually gets called is controlled by the
+ * AI_PROVIDER env var (see aiProvider.js) — 'anthropic' (default) or
+ * 'groq'. The response shape is identical either way.
+ *
  * Response: { results: [{id, category, category_group}], failedIds: [...],
- *             batchErrors: [...], totalProcessed, totalFailed }
+ *             batchErrors: [...], totalProcessed, totalFailed, provider }
  */
 router.post('/categorise-transactions', async (req, res) => {
   try {
-    if (!process.env.ANTHROPIC_API_KEY) {
+    let provider
+    try {
+      provider = getProvider()
+    } catch (err) {
+      return res.status(500).json({ error: err.message })
+    }
+
+    if (!process.env[provider.requiredEnvVar]) {
       return res.status(500).json({
-        error: 'ANTHROPIC_API_KEY is not configured on this server. Add it to Railway environment variables (or .env locally) before using categorisation.',
+        error: `${provider.requiredEnvVar} is not configured on this server (AI_PROVIDER="${provider.name}"). Add it to Railway environment variables (or .env locally) before using categorisation.`,
       })
     }
 
@@ -44,8 +55,8 @@ router.post('/categorise-transactions', async (req, res) => {
       }
     }
 
-    const result = await categoriseTransactions(transactions, callClaude)
-    return res.json(result)
+    const result = await categoriseTransactions(transactions, provider.call)
+    return res.json({ ...result, provider: provider.name })
   } catch (err) {
     console.error('Categorisation error:', err)
     return res.status(500).json({ error: err.message || 'Failed to categorise transactions.' })

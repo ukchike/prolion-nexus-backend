@@ -64,21 +64,37 @@ Respond with ONLY a JSON array, no markdown code fences, no explanation, no prea
 
 /**
  * Strips markdown code fences if the model added them despite being
- * asked not to (this happens often enough in practice to guard against),
- * then parses the JSON. Throws if the result isn't valid JSON.
+ * asked not to, then parses the JSON. Falls back to extracting the
+ * first [...] block from anywhere in the text if that still fails —
+ * smaller/open-weight models (e.g. via Groq) tend to be chattier about
+ * wrapping JSON in explanatory preamble/postamble than Claude is, even
+ * when explicitly told not to. Named generically (not "parseClaude...")
+ * since this is shared across whichever provider is configured.
  */
-function parseClaudeResponse(responseText) {
+function parseAIResponse(responseText) {
   const cleaned = responseText
     .trim()
     .replace(/^```(?:json)?\s*/i, '')
     .replace(/\s*```$/i, '')
     .trim()
 
-  const parsed = JSON.parse(cleaned)
-  if (!Array.isArray(parsed)) {
-    throw new Error('Expected a JSON array, got something else')
+  try {
+    const parsed = JSON.parse(cleaned)
+    if (!Array.isArray(parsed)) {
+      throw new Error('Expected a JSON array, got something else')
+    }
+    return parsed
+  } catch (firstAttemptError) {
+    const arrayMatch = cleaned.match(/\[[\s\S]*\]/)
+    if (!arrayMatch) {
+      throw firstAttemptError
+    }
+    const parsed = JSON.parse(arrayMatch[0])
+    if (!Array.isArray(parsed)) {
+      throw new Error('Expected a JSON array, got something else')
+    }
+    return parsed
   }
-  return parsed
 }
 
 /**
@@ -115,7 +131,7 @@ function chunk(array, size) {
 async function categoriseBatch(transactions, callClaude) {
   const prompt = buildPrompt(transactions)
   const responseText = await callClaude(prompt)
-  const parsed = parseClaudeResponse(responseText)
+  const parsed = parseAIResponse(responseText)
 
   const requestedIds = new Set(transactions.map((t) => String(t.id)))
   const results = []
@@ -181,7 +197,7 @@ async function categoriseTransactions(transactions, callClaude) {
 
 module.exports = {
   buildPrompt,
-  parseClaudeResponse,
+  parseAIResponse,
   validateEntry,
   categoriseBatch,
   categoriseTransactions,
