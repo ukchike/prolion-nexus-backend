@@ -13,9 +13,29 @@
  * client statement with hundreds of transactions.
  */
 
+/**
+ * Run this AFTER adding a real API key to your .env, to do one real
+ * end-to-end check that the categorisation engine works against a live
+ * AI provider — not a mocked response like test/categorise.test.js.
+ *
+ * Tests whichever provider AI_PROVIDER selects (defaults to 'anthropic';
+ * set AI_PROVIDER=groq in .env to test the free Groq alternative instead)
+ * — same provider-selection logic the real route uses, so this is a
+ * faithful test of what production will actually do.
+ *
+ * Usage:
+ *   cd nexus-backend
+ *   node scripts/smoke-test-categorise.js
+ *
+ * This makes ONE real API call and prints what the model actually
+ * returned for 9 sample transactions, so you can eyeball whether the
+ * categories look sensible before trusting this on a real client
+ * statement with hundreds of transactions.
+ */
+
 require('dotenv').config()
 const { categoriseTransactions } = require('../src/lib/categorisationEngine')
-const { callClaude } = require('../src/lib/anthropicClient')
+const { getProvider } = require('../src/lib/aiProvider')
 
 const SAMPLE_TRANSACTIONS = [
   { id: '1', description: 'TRANSFER FROM DANGOTE AGRO LTD', debit: null, credit: 500000 },
@@ -34,15 +54,23 @@ const SAMPLE_TRANSACTIONS = [
 ]
 
 async function main() {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    console.error('ANTHROPIC_API_KEY is not set in your .env. Get one from console.anthropic.com first.')
+  const provider = getProvider()
+
+  if (!process.env[provider.requiredEnvVar]) {
+    console.error(
+      `${provider.requiredEnvVar} is not set in your .env (AI_PROVIDER="${provider.name}"). ` +
+      (provider.name === 'groq'
+        ? 'Get a free key from console.groq.com first.'
+        : 'Get one from console.anthropic.com first.')
+    )
     process.exit(1)
   }
 
-  console.log(`Sending ${SAMPLE_TRANSACTIONS.length} sample transactions to Claude...`)
-  console.log('(This makes one real, billed API call.)\n')
+  console.log(`Provider: ${provider.name}`)
+  console.log(`Sending ${SAMPLE_TRANSACTIONS.length} sample transactions...`)
+  console.log('(This makes one real API call.)\n')
 
-  const result = await categoriseTransactions(SAMPLE_TRANSACTIONS, callClaude)
+  const result = await categoriseTransactions(SAMPLE_TRANSACTIONS, provider.call)
 
   console.log('=== RESULTS ===')
   for (const r of result.results) {
