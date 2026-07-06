@@ -1,15 +1,7 @@
 /**
  * Parses CSV and Excel (.xlsx) exports into the same transaction shape
- * the PDF parsers produce: { transaction_date, description, debit, credit, balance }
- *
- * Many Nigerian banks let customers export a clean CSV/Excel directly
- * from internet banking — this is the easiest input format and should
- * be encouraged to your clients where possible, since it skips all the
- * PDF layout guesswork entirely.
- *
- * Column headers are matched flexibly (case-insensitive, partial match)
- * since banks label columns differently: "Narration" vs "Description",
- * "Withdrawal" vs "Debit", "Deposit" vs "Credit".
+ * the PDF parsers produce. Column headers matched flexibly since banks
+ * label columns differently.
  */
 
 const Papa = require('papaparse')
@@ -27,14 +19,10 @@ const HEADER_ALIASES = {
 function matchHeader(headerRow) {
   const normalised = headerRow.map((h) => (h || '').toString().trim().toLowerCase())
   const columnMap = {}
-
   for (const [field, aliases] of Object.entries(HEADER_ALIASES)) {
-    const colIndex = normalised.findIndex((h) =>
-      aliases.some((alias) => h.includes(alias))
-    )
+    const colIndex = normalised.findIndex((h) => aliases.some((alias) => h.includes(alias)))
     if (colIndex !== -1) columnMap[field] = colIndex
   }
-
   return columnMap
 }
 
@@ -70,10 +58,7 @@ function rowsToTransactions(rows) {
 
     const rawDate = row[columnMap.date]
     const transactionDate =
-      rawDate instanceof Date
-        ? rawDate.toISOString().slice(0, 10)
-        : normaliseDate((rawDate || '').toString())
-
+      rawDate instanceof Date ? rawDate.toISOString().slice(0, 10) : normaliseDate((rawDate || '').toString())
     const description = (row[columnMap.description] || '').toString().trim()
     const debit = columnMap.debit !== undefined ? parseAmount(row[columnMap.debit]) : null
     const credit = columnMap.credit !== undefined ? parseAmount(row[columnMap.credit]) : null
@@ -100,13 +85,11 @@ async function parseExcelBuffer(buffer) {
   const workbook = new ExcelJS.Workbook()
   await workbook.xlsx.load(buffer)
   const worksheet = workbook.worksheets[0]
-
   const rows = []
   worksheet.eachRow({ includeEmpty: false }, (row) => {
-    const values = row.values.slice(1) // exceljs rows are 1-indexed; drop the leading undefined
+    const values = row.values.slice(1)
     rows.push(values.map((v) => (v && v.result !== undefined ? v.result : v)))
   })
-
   return rowsToTransactions(rows)
 }
 

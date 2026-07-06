@@ -1,26 +1,13 @@
 /**
- * Core AI categorisation logic.
- *
- * Deliberately separated from the Express route (categorise.js) so the
+ * Core AI categorisation logic. Separated from the Express route so the
  * prompt-building and response-parsing logic can be unit-tested with a
- * mocked Claude response, without needing a real API key or network call.
- * The actual live API call (callClaudeForBatch) is the only part that
- * can't be exercised without a real ANTHROPIC_API_KEY — see
- * test/categorise.test.js for what IS covered.
+ * mocked AI response, without a real API key or network call.
  */
 
 const { ALL_CATEGORIES, CATEGORY_TO_GROUP, CATEGORY_GROUPS, UNCLASSIFIED_CATEGORIES } = require('./categoryTaxonomy')
 
-const FALLBACK_CATEGORY = UNCLASSIFIED_CATEGORIES[0] // 'Uncategorised'
-
-// How many transactions go into a single Claude API call. Keeps prompt
-// size and output size predictable, and means a failure only affects
-// one chunk's worth of transactions rather than the whole statement.
+const FALLBACK_CATEGORY = UNCLASSIFIED_CATEGORIES[0]
 const BATCH_SIZE = 40
-
-// Hard ceiling on a single request to this endpoint — a safety guard
-// against an accidental request for an unreasonable number of
-// transactions running up API costs unexpectedly.
 const MAX_TRANSACTIONS_PER_REQUEST = 1000
 
 function buildPrompt(transactions) {
@@ -29,8 +16,6 @@ function buildPrompt(transactions) {
   const transactionLines = transactions
     .map((t) => {
       const movement = t.debit ? `debit ${t.debit}` : t.credit ? `credit ${t.credit}` : 'no amount'
-      // Truncate very long descriptions so one noisy transaction doesn't
-      // blow out the prompt size disproportionately.
       const description = (t.description || '').slice(0, 200)
       return `${t.id} | ${description} | ${movement}`
     })
@@ -54,6 +39,21 @@ Guidance:
   - For the Current vs Non-current choice on loans: if the description mentions "overdraft", "short-term", or gives no term information at all, default to Current — that's the more common case for informal SME lending. Only use Non-current if the description clearly indicates a multi-year term (e.g. "term loan", "asset finance", "mortgage")
   - Money withdrawn by an owner/director for personal use (not a business expense, not payroll) is "Owner/Director Withdrawal" (Balance Sheet), never an expense category
   - Capital injected by an owner/shareholder is "Capital Introduced" (Balance Sheet), never income
+  - A dividend payment to shareholders is "Dividend Paid" (Balance Sheet), never an expense
+- Director/shareholder current accounts — the DIRECTION determines the classification, not the account name:
+  - Money paid OUT to a director as a loan or advance the company expects back (description suggests loan/advance/IOU, not drawings and not salary) is "Staff & Director Loans (Advanced/Repaid)" (Balance Sheet, a receivable) — a director owing the company is an asset, never a negative liability
+  - Money received back from a director repaying such an advance is also "Staff & Director Loans (Advanced/Repaid)"
+  - Money coming IN from a director as a loan TO the company is "Loan Received - Current" (a related-party liability), unless clearly a capital injection ("Capital Introduced")
+- Foreign exchange differences are split by direction and are never ordinary operating items:
+  - A realised exchange GAIN (description mentions FX gain, exchange difference in the business's favour, revaluation credit) is "Foreign Exchange Gain" (Income)
+  - A realised exchange LOSS is "Foreign Exchange Loss" — this is a non-operating expense, kept out of ordinary operating costs so it does not distort Operating Profit
+- Cost of Sales vs Operating Expenses (both are Expense category_group, but distinct for Gross Profit purposes):
+  - Payments for raw materials, stock, or goods purchased for resale are "Cost of Goods Sold (Purchases)"
+  - Wages paid specifically to staff directly involved in production/making the goods sold (not general admin/office staff) are "Direct Wages"
+  - Costs directly tied to acquiring or producing the goods sold (e.g. carriage inwards, import clearing on stock) are "Direct Expenses (incl. Carriage Inwards)"
+  - When in doubt whether a cost is Cost of Sales or a general Operating Expense, prefer the Operating Expense category — Cost of Sales should only be used when the description clearly ties the cost to producing/acquiring goods for resale
+- A payment received that's clearly settlement of an old invoice (not a new sale) is "Trade Receivables Collected"; a payment made that's clearly settling an old supplier bill (not a new purchase) is "Trade Payables Settled" — both Balance Sheet, not Income/Expense
+- An upfront payment for a future period (e.g. a year's rent or insurance paid in advance) is "Prepaid Expenses" (Balance Sheet), not an immediate expense
 
 Transactions (format: id | description | amount):
 ${transactionLines}
@@ -63,13 +63,10 @@ Respond with ONLY a JSON array, no markdown code fences, no explanation, no prea
 }
 
 /**
- * Strips markdown code fences if the model added them despite being
- * asked not to, then parses the JSON. Falls back to extracting the
- * first [...] block from anywhere in the text if that still fails —
- * smaller/open-weight models (e.g. via Groq) tend to be chattier about
- * wrapping JSON in explanatory preamble/postamble than Claude is, even
- * when explicitly told not to. Named generically (not "parseClaude...")
- * since this is shared across whichever provider is configured.
+ * Strips markdown code fences, then parses the JSON. Falls back to
+ * extracting the first [...] block from anywhere in the text — smaller/
+ * open-weight models (e.g. via Groq) are chattier about wrapping JSON in
+ * explanatory text than Claude, even when told not to.
  */
 function parseAIResponse(responseText) {
   const cleaned = responseText
@@ -97,20 +94,10 @@ function parseAIResponse(responseText) {
   }
 }
 
-/**
- * Validates and normalises one parsed entry from Claude's response.
- * If the category isn't one we recognise (hallucinated or misspelled),
- * falls back to "Uncategorised" rather than saving a category_group
- * that doesn't actually exist in the schema's CHECK constraint — an
- * invalid category_group would make the database insert/update fail
- * outright, which is worse than a slightly-wrong-but-valid fallback.
- */
 function validateEntry(entry) {
-  if (!entry || typeof entry.id !== 'string' && typeof entry.id !== 'number') return null
-
+  if (!entry || (typeof entry.id !== 'string' && typeof entry.id !== 'number')) return null
   const category = ALL_CATEGORIES.includes(entry.category) ? entry.category : FALLBACK_CATEGORY
   const category_group = CATEGORY_TO_GROUP[category] || CATEGORY_GROUPS.UNCLASSIFIED
-
   return { id: String(entry.id), category, category_group }
 }
 
@@ -122,15 +109,9 @@ function chunk(array, size) {
   return chunks
 }
 
-/**
- * Categorises one batch (already chunked to BATCH_SIZE or smaller) by
- * calling the provided `callClaude` function and validating the result.
- * `callClaude` is injected so this function can be unit-tested with a
- * fake implementation instead of a real API call.
- */
-async function categoriseBatch(transactions, callClaude) {
+async function categoriseBatch(transactions, callAI) {
   const prompt = buildPrompt(transactions)
-  const responseText = await callClaude(prompt)
+  const responseText = await callAI(prompt)
   const parsed = parseAIResponse(responseText)
 
   const requestedIds = new Set(transactions.map((t) => String(t.id)))
@@ -143,23 +124,13 @@ async function categoriseBatch(transactions, callClaude) {
     }
   }
 
-  // Any transaction Claude didn't return a result for (response was
-  // short, malformed for that entry, etc.) is reported as failed rather
-  // than silently dropped — the caller decides what to do (retry, leave
-  // UNCLASSIFIED, surface to the user).
   const returnedIds = new Set(results.map((r) => r.id))
   const failedIds = transactions.map((t) => String(t.id)).filter((id) => !returnedIds.has(id))
 
   return { results, failedIds }
 }
 
-/**
- * Main entry point: categorises an arbitrary-length list of transactions
- * by splitting into BATCH_SIZE chunks and processing them in sequence.
- * Sequential (not parallel) deliberately — keeps Claude API rate limits
- * predictable; can be revisited for parallel chunks once volume justifies it.
- */
-async function categoriseTransactions(transactions, callClaude) {
+async function categoriseTransactions(transactions, callAI) {
   if (transactions.length > MAX_TRANSACTIONS_PER_REQUEST) {
     throw new Error(
       `Too many transactions in one request (${transactions.length}). Max is ${MAX_TRANSACTIONS_PER_REQUEST} — split into smaller requests.`
@@ -173,13 +144,10 @@ async function categoriseTransactions(transactions, callClaude) {
 
   for (let i = 0; i < batches.length; i++) {
     try {
-      const { results, failedIds } = await categoriseBatch(batches[i], callClaude)
+      const { results, failedIds } = await categoriseBatch(batches[i], callAI)
       allResults.push(...results)
       allFailedIds.push(...failedIds)
     } catch (err) {
-      // One bad batch (network error, completely malformed response)
-      // doesn't take down the whole request — those transactions are
-      // reported as failed, everything else still gets processed.
       const idsInBatch = batches[i].map((t) => String(t.id))
       allFailedIds.push(...idsInBatch)
       batchErrors.push({ batchIndex: i, error: err.message })

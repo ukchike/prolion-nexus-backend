@@ -1,10 +1,7 @@
 /**
- * Picks which AI provider to use for categorisation, based on the
- * AI_PROVIDER environment variable. Defaults to 'anthropic' for
- * backward compatibility — set AI_PROVIDER=groq in .env / Railway to
- * use the free Groq option instead while ANTHROPIC_API_KEY's account
- * has no funded credits. Switching back later is a one-line env var
- * change, not a code change.
+ * Picks which AI provider to use, based on the AI_PROVIDER env var.
+ * Defaults to 'anthropic'. Set AI_PROVIDER=groq to use the free Groq
+ * option. Switching is an env var change, not a code change.
  */
 
 const { callClaude } = require('./anthropicClient')

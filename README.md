@@ -1,158 +1,54 @@
-# NEXUS Backend — Statement Parsing Service
+# NEXUS Backend
 
-A stateless Node.js/Express service that takes a bank statement file
-(PDF, CSV, or Excel) and returns structured transactions. It does **not**
-touch Supabase or any database — the frontend (`nexus-app`) is responsible
-for storing the original file and the parsed transactions. This service's
-only job is: file in, transactions out.
+Stateless parsing + AI categorisation service for NEXUS by Prolion.
+Deployed on Railway. Never touches Supabase — file/transactions in, structured data out.
 
-## Calibration notice
+## Endpoints
+- `GET /health`
+- `POST /api/parse-statement` — multipart `file` (+ `bankCode` for PDFs: `access` | `zenith` | `gtb`)
+- `POST /api/categorise-transactions` — `{ transactions: [{id, description, debit, credit}] }`, max 1000/request, batches of 40
 
-**Access Bank and Zenith Bank are now calibrated against real statements**
-(both from RAL Paints Ltd, May/June 2026):
+## Parser calibration status
+| Parser | Status |
+|---|---|
+| Access (specific) | CALIBRATED — verified against real e-statement (117 txns in production) |
+| Zenith (specific) | CALIBRATED — verified, totals match statement footer exactly |
+| Generic multi-layout ('auto') | Covers the 4 common Nigerian internet/mobile-banking layout families. Verified against a 36-bank SPECIMEN pack — every statement reconciled to its own printed Total Credit / Total Debit / Closing Balance (543 txns, 0 failures). Specimens are synthetic; spot-check each genuinely new bank's REAL export before relying on it |
+| GTB (specific) | Assumed layout, no real statement yet — falls back to 'auto' automatically if it finds nothing |
+| CSV/Excel | Working (synthetic fixtures) |
 
-- `src/parsers/access.js` — multi-line blocks, debit/credit in separate
-  columns. See `test/fixtures/access-real-sample.txt`.
-- `src/parsers/zenith.js` — different again: two leading dates, amounts
-  sometimes inline with the description, debit/credit direction inferred
-  from the running balance rather than separate columns. See
-  `test/fixtures/zenith-real-sample.txt`.
+The four generic layout families:
+- WALLET — `01 Jun 2026 | details | amount | CREDIT/DEBIT | balance` (Carbon, OPay, Moniepoint, Kuda, PalmPay, LAPO, FairMoney, Renmoney, VFD, Accion)
+- TRANSVALUE — trans date + value date + debit/credit slots (Unity, Providus, Titan, Signature, Fidelity, Stanbic, Union, UBA)
+- REFERENCE — date + REF token + slots; handles amounts jammed against the description with no space (Citibank, Globus, Parallex, Optimus, GTB, Ecobank, Sterling, Polaris)
+- NARRATION — `DD/MM/YYYY | narration | withdrawal | lodgement | balance` (StanChart, PremiumTrust, SunTrust, Nova, FirstBank, FCMB, Wema, Keystone)
 
-Both were validated not just by checking individual fields, but by
-confirming totals against the statement's own footer summary (total
-debits, total credits, closing balance) — an independent cross-check
-that catches errors a field-by-field comparison could miss.
+Handles: "-" empty slots, negative (overdrawn) balances, reversal credits.
+Calibration harness: `node scripts/calibration-run.js <extracted-text.txt>` reconciles every statement in a pack against its own printed control totals.
 
-**GTB is still uncalibrated** — built from common Nigerian e-statement
-layout patterns, verified only against synthetic test data, never tested
-against a real GTB statement. Given that all three banks turned out to
-have genuinely different layouts from one another, do not assume GTB's
-current single-line-per-transaction logic is correct — test it the same
-way Access and Zenith just were before trusting it on real client data.
+Dispatcher behaviour: bankCode 'auto' uses the generic engine directly; a bank-specific parser that finds zero transactions falls back to 'auto' automatically, and the response's `parserUsed` field reports which engine actually produced the result.
 
-If a real statement doesn't parse correctly, use the `rawTextPreview`
-field in the API response (or the "Show raw extracted text" button in
-the frontend) to see exactly what `pdf-parse` extracted, then build a
-real parser for it the way `access.js` and `zenith.js` were built —
-don't assume it'll resemble either of those two structurally.
+## AI categorisation
+46-category FIRS-aligned taxonomy (`src/lib/categoryTaxonomy.js`):
+4 Income, 24 Expense (4 Cost of Sales + 20 Operating), 16 Balance Sheet
+(5 IFRS-for-SMEs subgroups), 1 Transfer, 1 Unclassified. CIT-sensitive
+categories (Fines & Penalties, Donations, CSR, Entertainment) kept
+distinct because they are not fully tax-deductible.
 
-## Setup
+Provider is selected by `AI_PROVIDER` env var: `anthropic` (default,
+Claude Haiku) or `groq` (free, Llama 3.3 70B). Same endpoint, same
+response shape.
 
-```bash
-npm install
-cp .env.example .env
-npm run dev
+## Environment (.env locally, Railway variables when deployed)
+```
+PORT=4000
+FRONTEND_URL=<vercel url>
+AI_PROVIDER=groq
+GROQ_API_KEY=<from console.groq.com>
+ANTHROPIC_API_KEY=<optional, once funded>
 ```
 
-Confirm it's running:
-```bash
-curl http://localhost:4000/health
-```
-
-## Testing the parser
-
-```bash
-npm test
-```
-
-This runs `test/parser.test.js` against two synthetic fixtures:
-- `test/fixtures/sample-statement.csv`
-- `test/fixtures/sample-gtb-statement.pdf` (regenerate with
-  `node test/generate-fixture-pdf.js` if needed)
-
-## API
-
-### `GET /health`
-Returns `{ status: 'ok' }` — use this to confirm the service is up.
-
-### `POST /api/parse-statement`
-Multipart form data:
-- `file` (required) — the statement file (.pdf, .csv, .xlsx, .xls)
-- `bankCode` (required for PDF only) — one of `gtb`, `access`, `zenith`
-
-Response:
-```json
-{
-  "fileName": "statement.pdf",
-  "fileType": "pdf",
-  "bankCode": "gtb",
-  "transactionCount": 8,
-  "unparsedCount": 0,
-  "transactions": [
-    { "transaction_date": "2025-01-01", "description": "...", "debit": null, "credit": 500000, "balance": 500000 }
-  ],
-  "unparsedLines": [],
-  "rawTextPreview": "..."
-}
-```
-
-## Adding a new bank
-
-1. Create `src/parsers/yourbank.js` — start by copying `access.js` as a template
-2. Register it in `src/parsers/index.js` (`SUPPORTED_BANKS` array and
-   `PDF_TEXT_PARSERS` map)
-3. Add it to `BANK_OPTIONS` in the frontend's `StatementUpload.jsx`
-4. Get a real sample statement and calibrate `assignAmounts()` /
-   `textHelpers.js` patterns against it
-
-## Known dependency note
-
-`exceljs` depends on an older `uuid` version with a moderate-severity
-advisory (buffer bounds check, only relevant if `uuid` is called with a
-caller-supplied buffer — not how `exceljs` uses it internally). Run
-`npm audit` periodically and re-evaluate if `exceljs` ships an update.
-
-## Sprint 2: AI categorisation
-
-### `POST /api/categorise-transactions`
-Body: `{ "transactions": [{ "id", "description", "debit", "credit" }, ...] }`
-
-Sends transactions to Claude (Haiku, by default — see `src/lib/anthropicClient.js`
-for why) in batches of 40, asks it to assign one category per transaction
-from the fixed taxonomy in `src/lib/categoryTaxonomy.js`, and derives
-`category_group` deterministically from whatever category it picks
-(never trusts the model to report group and category consistently on
-its own). Unrecognised/hallucinated categories fall back to
-"Uncategorised" rather than breaking the database insert.
-
-Response: `{ results: [{id, category, category_group}], failedIds, batchErrors, totalProcessed, totalFailed }`
-
-**Setup**: add `ANTHROPIC_API_KEY` (from console.anthropic.com) to your
-`.env` locally and to Railway's environment variables when deployed.
-Without it, this endpoint returns a clear 500 error rather than failing
-silently.
-
-**No funded Anthropic account yet?** Set `AI_PROVIDER=groq` and
-`GROQ_API_KEY` (free, no card required, from console.groq.com) instead —
-same endpoint, same response shape, just a different model underneath
-(Llama 3.3 70B via Groq instead of Claude Haiku). Switch back to Claude
-later by changing `AI_PROVIDER` back to `anthropic` (or removing it,
-since that's the default) — no code changes needed either way. See
-`src/lib/aiProvider.js` for the selection logic.
-
-One thing to watch for with Groq specifically: smaller/open-weight models
-tend to be chattier about wrapping JSON in explanatory text despite being
-told not to, more so than Claude. The response parser
-(`parseAIResponse` in `categorisationEngine.js`) has a fallback for this,
-but if categorisation quality looks off, check the raw response shape
-first before assuming the categories themselves are wrong.
-
-**Testing**: `node test/categorise.test.js` runs the prompt-building,
-response-parsing, validation, batching, and provider-selection logic
-against MOCKED responses — no API key needed, no real cost. This is NOT
-a test of the live API call itself. For that, run
-`node scripts/smoke-test-categorise.js` after adding a real key for
-whichever provider you've configured — it makes one real (cheap or free,
-depending on provider) API call against 9 sample transactions and prints
-the categories so you can eyeball whether they look right, including the
-3 specifically testing the Balance Sheet reclassification (loan
-received/repayment, owner withdrawal).
-
-## Deployment
-
-This is a long-running Node server — deploy to **Railway** or **Render**,
-not Vercel (Vercel is for the static frontend). After deploying:
-1. Set `FRONTEND_URL` in this service's environment variables to your
-   deployed Vercel URL (for CORS)
-2. Set `VITE_API_BASE_URL` in the frontend's Vercel environment variables
-   to this service's deployed URL
+## Testing
+- `node test/parser.test.js` — parsers vs real fixtures (no network)
+- `node test/categorise.test.js` — categorisation logic vs mocked AI (no key needed)
+- `node scripts/smoke-test-categorise.js` — ONE real API call to whichever provider is configured

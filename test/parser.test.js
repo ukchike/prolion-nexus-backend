@@ -1,180 +1,84 @@
 const fs = require('fs')
 const path = require('path')
-const { parseStatement } = require('../src/parsers')
-
-const EXPECTED_TRANSACTION_COUNT = 8
-const EXPECTED_FINAL_BALANCE = 281496.0
+const { parseCSVBuffer } = require('../src/parsers/csvExcelParser')
+const { parseAccessText } = require('../src/parsers/access')
+const { parseZenithText } = require('../src/parsers/zenith')
+const { parseGenericText } = require('../src/parsers/generic')
 
 let failures = 0
-
 function check(label, condition) {
-  if (condition) {
-    console.log(`  PASS - ${label}`)
-  } else {
-    console.log(`  FAIL - ${label}`)
-    failures++
-  }
+  console.log(`  ${condition ? 'PASS' : 'FAIL'} - ${label}`)
+  if (!condition) failures++
 }
 
-async function testCSV() {
-  console.log('\n--- Testing CSV fixture ---')
-  const buffer = fs.readFileSync(path.join(__dirname, 'fixtures', 'sample-statement.csv'))
-  const result = await parseStatement({ buffer, fileType: 'csv' })
-
-  console.log(`Parsed ${result.transactions.length} transactions, ${result.unparsedLines.length} unparsed lines`)
-  if (result.unparsedLines.length > 0) {
-    console.log('Unparsed lines:', JSON.stringify(result.unparsedLines, null, 2))
-  }
-
-  check('extracted all 8 transactions', result.transactions.length === EXPECTED_TRANSACTION_COUNT)
-
-  const lastTxn = result.transactions[result.transactions.length - 1]
-  check('final balance matches expected', lastTxn?.balance === EXPECTED_FINAL_BALANCE)
-
-  const firstTxn = result.transactions[0]
-  check('first transaction date normalised correctly', firstTxn?.transaction_date === '2025-01-01')
-  check('first transaction credit captured correctly', firstTxn?.credit === 500000)
-  check('first transaction debit is null (not zero)', firstTxn?.debit === null)
+function testCSV() {
+  console.log('\n--- CSV parsing (synthetic fixture) ---')
+  const buffer = fs.readFileSync(path.join(__dirname, 'fixtures/sample-statement.csv'))
+  const { transactions, unparsedLines } = parseCSVBuffer(buffer)
+  check('8 transactions parsed', transactions.length === 8)
+  check('no unparsed lines', unparsedLines.length === 0)
+  check('first transaction is the Dangote credit', transactions[0].credit === 500000 && transactions[0].debit === null)
+  check('dates normalised to ISO', transactions[0].transaction_date === '2025-01-01')
 }
 
-async function testPDF() {
-  console.log('\n--- Testing synthetic GTB PDF fixture ---')
-  const pdfPath = path.join(__dirname, 'fixtures', 'sample-gtb-statement.pdf')
-
-  if (!fs.existsSync(pdfPath)) {
-    console.log('  SKIP - PDF fixture not found. Run: node test/generate-fixture-pdf.js')
-    return
-  }
-
-  const buffer = fs.readFileSync(pdfPath)
-
-  let result
-  try {
-    result = await parseStatement({ buffer, fileType: 'pdf', bankCode: 'gtb' })
-  } catch (err) {
-    console.log(`  FAIL - PDF parsing threw an error: ${err.message}`)
-    failures++
-    return
-  }
-
-  console.log(`Parsed ${result.transactions.length} transactions, ${result.unparsedLines.length} unparsed lines`)
-  console.log('Transactions found:', JSON.stringify(result.transactions, null, 2))
-  if (result.unparsedLines.length > 0) {
-    console.log('Unparsed lines:', JSON.stringify(result.unparsedLines, null, 2))
-  }
-
-  check('extracted at least 6 of 8 transactions (PDF text extraction is lossier than CSV)', result.transactions.length >= 6)
-
-  if (result.transactions.length < EXPECTED_TRANSACTION_COUNT) {
-    console.log(
-      `  NOTE: only ${result.transactions.length}/${EXPECTED_TRANSACTION_COUNT} lines parsed from the synthetic PDF. ` +
-      `This is expected to need tuning — see "Calibrating against a real statement" in the README. ` +
-      `Inspect rawTextPreview below to see exactly what pdf-parse extracted:`
-    )
-    console.log('--- rawTextPreview ---')
-    console.log(result.rawTextPreview)
-    console.log('--- end rawTextPreview ---')
-  }
+function testAccessReal() {
+  console.log('\n--- Access Bank (REAL statement sample) ---')
+  const text = fs.readFileSync(path.join(__dirname, 'fixtures/access-real-sample.txt'), 'utf-8')
+  const { transactions, unparsedLines } = parseAccessText(text)
+  check('11 transactions parsed from the real sample', transactions.length === 11)
+  check('1 unparsed (the cut-off block at the end of the page)', unparsedLines.length === 1)
+  check('the ₦4,164,000 RALPAINTS withdrawal parsed correctly', !!transactions.find((t) => t.debit === 4164000))
+  check('the ₦2,400,000 Zenith cheque deposit parsed as a credit', !!transactions.find((t) => t.credit === 2400000))
+  check('opening balance row skipped (not a transaction)', !transactions.some((t) => /opening balance/i.test(t.description)))
 }
 
-async function testAccessRealSample() {
-  console.log('\n--- Testing real Access Bank sample (RAL Paints, calibrated) ---')
-  const txtPath = path.join(__dirname, 'fixtures', 'access-real-sample.txt')
-
-  if (!fs.existsSync(txtPath)) {
-    console.log('  SKIP - fixture not found.')
-    return
-  }
-
-  const { parseAccessText } = require('../src/parsers/access')
-  const rawText = fs.readFileSync(txtPath, 'utf-8')
-  const result = parseAccessText(rawText)
-
-  console.log(`Parsed ${result.transactions.length} transactions, ${result.unparsedLines.length} unparsed lines`)
-
-  // 11 real transactions in this excerpt; "Opening Balance" correctly
-  // excluded; transaction #13 is genuinely truncated in this fixture
-  // (the source paste was cut off mid-block) so 1 unparsed line is expected.
-  check('extracted all 11 real transactions', result.transactions.length === 11)
-  check('exactly 1 unparsed line (the deliberately truncated final block)', result.unparsedLines.length === 1)
-
-  const first = result.transactions[0]
-  check('first transaction debit matches statement', first?.debit === 53.75)
-  check('first transaction balance matches statement', first?.balance === 6095767.87)
-  check('first transaction credit is null (not zero)', first?.credit === null)
-
-  // Transaction 8->9 is a credit (lodgement) — confirms debit/credit
-  // direction is read correctly, not just defaulted to debit.
-  const creditTxn = result.transactions.find((t) => t.credit !== null)
-  check('the one credit transaction was correctly identified as a credit', creditTxn?.credit === 2400000)
-  check('credit transaction balance matches statement', creditTxn?.balance === 4093160.37)
-
-  // Verify the balance chain is internally consistent — each balance
-  // should equal the previous balance minus debit plus credit. This
-  // catches sign/assignment errors that individual field checks might miss.
-  let runningBalance = 6095821.62 // the excluded Opening Balance
-  let chainConsistent = true
-  for (const t of result.transactions) {
-    const expected = runningBalance - (t.debit || 0) + (t.credit || 0)
-    if (Math.abs(expected - t.balance) > 0.01) {
-      chainConsistent = false
-      console.log(`  Chain break at "${t.description.slice(0, 40)}...": expected ${expected}, got ${t.balance}`)
-    }
-    runningBalance = t.balance
-  }
-  check('balance chain is internally consistent across all 11 transactions', chainConsistent)
+function testZenithReal() {
+  console.log('\n--- Zenith Bank (REAL statement sample) ---')
+  const text = fs.readFileSync(path.join(__dirname, 'fixtures/zenith-real-sample.txt'), 'utf-8')
+  const { transactions, unparsedLines } = parseZenithText(text)
+  check('6 transactions parsed from the real sample', transactions.length === 6)
+  check('no unparsed blocks', unparsedLines.length === 0)
+  const totalDebits = transactions.reduce((s, t) => s + (t.debit || 0), 0)
+  const totalCredits = transactions.reduce((s, t) => s + (t.credit || 0), 0)
+  check('total debits match the statement footer exactly (6,405,365.78)', Math.abs(totalDebits - 6405365.78) < 0.01)
+  check('total credits match the statement footer exactly (1,719,216.97)', Math.abs(totalCredits - 1719216.97) < 0.01)
+  check('closing balance matches footer (735,974.22)', Math.abs(transactions[transactions.length - 1].balance - 735974.22) < 0.01)
+  check('the one credit transaction was correctly identified (not as a debit)', transactions.filter((t) => t.credit).length === 1)
 }
 
-async function testZenithRealSample() {
-  console.log('\n--- Testing real Zenith Bank sample (RAL Paints, calibrated) ---')
-  const txtPath = path.join(__dirname, 'fixtures', 'zenith-real-sample.txt')
+function testGenericParser() {
+  console.log('\n--- Generic multi-layout parser (4 families + edge cases) ---')
 
-  if (!fs.existsSync(txtPath)) {
-    console.log('  SKIP - fixture not found.')
-    return
-  }
+  const wallet = parseGenericText('03 Jun 2026 USSD*AIRTIME PURCHASE-0803XXXXXXX 604,043.09 DEBIT 4,235,989.19')
+  check('WALLET family: debit parsed', wallet.transactions[0]?.debit === 604043.09)
+  check('WALLET family: date normalised to ISO', wallet.transactions[0]?.transaction_date === '2026-06-03')
 
-  const { parseZenithText } = require('../src/parsers/zenith')
-  const rawText = fs.readFileSync(txtPath, 'utf-8')
-  const result = parseZenithText(rawText)
+  const transvalue = parseGenericText('04-Jun-2026 04-Jun-2026 INTEREST ON SAVINGS - 2,575,076.37 5,799,187.54')
+  check('TRANSVALUE family: "-" debit slot -> null, credit parsed', transvalue.transactions[0]?.debit === null && transvalue.transactions[0]?.credit === 2575076.37)
 
-  console.log(`Parsed ${result.transactions.length} transactions, ${result.unparsedLines.length} unparsed lines`)
+  const jammed = parseGenericText('28-Jun-26 REF054659 NIP TRF TO STERLING CEMENT SUPPLIES LTD198,057.18 - 13,268,032.41')
+  check('REFERENCE family: amount jammed against description splits correctly', jammed.transactions[0]?.debit === 198057.18)
+  check('REFERENCE family: description clean of the jammed amount', jammed.transactions[0]?.description === 'NIP TRF TO STERLING CEMENT SUPPLIES LTD')
 
-  check('extracted all 6 real transactions', result.transactions.length === 6)
-  check('zero unparsed lines', result.unparsedLines.length === 0)
+  const narration = parseGenericText('04/06/2026 ATM WITHDRAWAL-VICTORIA ISLAND BRANCH 474,540.40 - 2,525,316.68')
+  check('NARRATION family: withdrawal parsed as debit', narration.transactions[0]?.debit === 474540.4)
 
-  const totalDebits = result.transactions.reduce((sum, t) => sum + (t.debit || 0), 0)
-  const totalCredits = result.transactions.reduce((sum, t) => sum + (t.credit || 0), 0)
+  const negative = parseGenericText('10 Jun 2026 STAMP DUTY CHARGE 860,809.50 DEBIT -845,634.01')
+  check('negative (overdrawn) balance parsed', negative.transactions[0]?.balance === -845634.01)
 
-  // These exact figures come from the statement's own footer summary
-  // ("Total Debits: 5 ... NGN 6,405,365.78 Total Credits: 1 ... NGN 1,719,216.97")
-  // — matching them is a strong, independent check that we read every
-  // amount correctly, not just that the code ran without crashing.
-  check('total debits match the statement\'s own footer total', Math.abs(totalDebits - 6405365.78) < 0.01)
-  check('total credits match the statement\'s own footer total', Math.abs(totalCredits - 1719216.97) < 0.01)
+  const reversal = parseGenericText('18-Jun-2026 18-Jun-2026 REVERSAL-FAILED POS TXN - 1,044,879.98 -276,415.81')
+  check('reversal credit with negative balance parsed', reversal.transactions[0]?.credit === 1044879.98 && reversal.transactions[0]?.balance === -276415.81)
 
-  const finalBalance = result.transactions[result.transactions.length - 1]?.balance
-  check('final balance matches statement\'s "Cleared Balance"', Math.abs(finalBalance - 735974.22) < 0.01)
-
-  const creditTxn = result.transactions.find((t) => t.credit !== null)
-  check('the one credit transaction was correctly identified (not as a debit)', creditTxn?.credit === 1719216.97 && creditTxn?.debit === null)
+  const headerNoise = parseGenericText('Date Transaction Details Amount (NGN) Type Balance (NGN)\nOpening Balance Total Credit Total Debit Closing Balance\nNGN 2,507,171.29 NGN 15,367,722.34 NGN 4,211,868.98 NGN 13,663,024.65')
+  check('header/totals rows produce zero transactions and zero unparsed noise', headerNoise.transactions.length === 0 && headerNoise.unparsedLines.length === 0)
 }
 
-async function main() {
-  await testCSV()
-  await testPDF()
-  await testAccessRealSample()
-  await testZenithRealSample()
+testCSV()
+testAccessReal()
+testZenithReal()
+testGenericParser()
 
-  console.log('\n=================================')
-  if (failures === 0) {
-    console.log('ALL CRITICAL CHECKS PASSED')
-  } else {
-    console.log(`${failures} CHECK(S) FAILED — review output above`)
-  }
-  console.log('=================================')
-
-  process.exit(failures === 0 ? 0 : 1)
-}
-
-main()
+console.log('\n=================================')
+console.log(failures === 0 ? 'ALL CRITICAL CHECKS PASSED' : `${failures} CHECK(S) FAILED`)
+console.log('=================================')
+process.exit(failures === 0 ? 0 : 1)

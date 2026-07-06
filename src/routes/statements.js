@@ -4,12 +4,11 @@ const { parseStatement } = require('../parsers')
 
 const router = express.Router()
 
-// Files are held in memory only — this service never writes uploaded
-// files to disk and never touches Supabase. It is a pure parsing
-// function: file in, structured transactions out.
+// Files held in memory only — this service never writes uploads to disk
+// and never touches Supabase. Pure function: file in, transactions out.
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB cap
+  limits: { fileSize: 10 * 1024 * 1024 },
 })
 
 function detectFileType(file) {
@@ -33,7 +32,7 @@ router.post('/parse-statement', upload.single('file'), async (req, res) => {
       })
     }
 
-    const bankCode = req.body.bankCode // required for PDFs, ignored for csv/excel
+    const bankCode = req.body.bankCode
 
     if (fileType === 'pdf' && !bankCode) {
       return res.status(400).json({

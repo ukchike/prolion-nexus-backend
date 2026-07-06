@@ -4,22 +4,6 @@ const { getProvider } = require('../lib/aiProvider')
 
 const router = express.Router()
 
-/**
- * POST /api/categorise-transactions
- * Body: { transactions: [{ id, description, debit, credit }, ...] }
- *
- * This route does NOT touch Supabase — same stateless pattern as
- * /api/parse-statement. The frontend is responsible for fetching the
- * transactions to send here, and for writing ai_category/category_group
- * back to the database once it gets a response.
- *
- * Which AI provider actually gets called is controlled by the
- * AI_PROVIDER env var (see aiProvider.js) — 'anthropic' (default) or
- * 'groq'. The response shape is identical either way.
- *
- * Response: { results: [{id, category, category_group}], failedIds: [...],
- *             batchErrors: [...], totalProcessed, totalFailed, provider }
- */
 router.post('/categorise-transactions', async (req, res) => {
   try {
     let provider

@@ -1,28 +1,23 @@
 {
   "name": "nexus-backend",
   "version": "1.0.0",
-  "description": "Stateless bank-statement parsing service for NEXUS by Prolion",
+  "description": "Stateless bank-statement parsing and AI categorisation service for NEXUS by Prolion",
   "main": "src/server.js",
-  "directories": {
-    "test": "test"
-  },
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "test": "node test/parser.test.js"
+    "test": "node test/parser.test.js && node test/categorise.test.js"
   },
-  "keywords": [],
-  "author": "",
   "license": "ISC",
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.106.0",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "exceljs": "^4.4.0",
     "express": "^5.2.1",
     "multer": "^2.2.0",
     "papaparse": "^5.5.4",
-    "pdf-parse": "^2.4.5"
+    "pdf-parse": "^2.4.5",
+    "@anthropic-ai/sdk": "^0.39.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.14",

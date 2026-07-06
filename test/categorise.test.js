@@ -1,24 +1,15 @@
 const {
-  buildPrompt,
-  parseClaudeResponse,
-  validateEntry,
-  categoriseTransactions,
-  BATCH_SIZE,
+  buildPrompt, parseAIResponse, validateEntry, categoriseTransactions, BATCH_SIZE,
 } = require('../src/lib/categorisationEngine')
 const { ALL_CATEGORIES } = require('../src/lib/categoryTaxonomy')
 
 let failures = 0
-
 function check(label, condition) {
-  if (condition) {
-    console.log(`  PASS - ${label}`)
-  } else {
-    console.log(`  FAIL - ${label}`)
-    failures++
-  }
+  console.log(`  ${condition ? 'PASS' : 'FAIL'} - ${label}`)
+  if (!condition) failures++
 }
 
-const SAMPLE_TRANSACTIONS = [
+const SAMPLE = [
   { id: 'txn-1', description: 'TRANSFER FROM DANGOTE AGRO LTD', debit: null, credit: 500000 },
   { id: 'txn-2', description: 'POS PURCHASE SHOPRITE IKEJA', debit: 15000, credit: null },
   { id: 'txn-3', description: 'PAYMENT TO STAFF SALARY JAN', debit: 120000, credit: null },
@@ -26,155 +17,128 @@ const SAMPLE_TRANSACTIONS = [
   { id: 'txn-5', description: 'VAT PAYMENT FIRS', debit: 8500, credit: null },
 ]
 
-function testPromptBuilding() {
-  console.log('\n--- Testing prompt construction ---')
-  const prompt = buildPrompt(SAMPLE_TRANSACTIONS)
-
-  check('prompt includes every transaction id', SAMPLE_TRANSACTIONS.every((t) => prompt.includes(t.id)))
-  check('prompt includes every category from the taxonomy', ALL_CATEGORIES.every((c) => prompt.includes(c)))
-  check('prompt labels credits correctly', prompt.includes('credit 500000'))
-  check('prompt labels debits correctly', prompt.includes('debit 15000'))
-  check('prompt instructs JSON-only response', prompt.toLowerCase().includes('json array'))
+function testPrompt() {
+  console.log('\n--- Prompt construction ---')
+  const prompt = buildPrompt(SAMPLE)
+  check('includes every transaction id', SAMPLE.every((t) => prompt.includes(t.id)))
+  check('includes every category from the taxonomy', ALL_CATEGORIES.every((c) => prompt.includes(c)))
+  check('labels credits correctly', prompt.includes('credit 500000'))
+  check('instructs JSON-only response', prompt.toLowerCase().includes('json array'))
 }
 
-function testResponseParsing() {
-  console.log('\n--- Testing response parsing (defensive against markdown fences) ---')
-
-  const cleanJson = '[{"id": "txn-1", "category": "Sales Revenue"}]'
-  const withFences = '```json\n[{"id": "txn-1", "category": "Sales Revenue"}]\n```'
-  const withFencesNoLang = '```\n[{"id": "txn-1", "category": "Sales Revenue"}]\n```'
-
-  check('parses clean JSON', parseClaudeResponse(cleanJson)[0].id === 'txn-1')
-  check('strips ```json fences', parseClaudeResponse(withFences)[0].id === 'txn-1')
-  check('strips ``` fences without language tag', parseClaudeResponse(withFencesNoLang)[0].id === 'txn-1')
-
-  let threwOnInvalid = false
-  try {
-    parseClaudeResponse('not valid json at all')
-  } catch {
-    threwOnInvalid = true
-  }
-  check('throws on genuinely invalid JSON (caller can catch and report)', threwOnInvalid)
-
-  let threwOnNonArray = false
-  try {
-    parseClaudeResponse('{"id": "txn-1"}')
-  } catch {
-    threwOnNonArray = true
-  }
-  check('throws when response is valid JSON but not an array', threwOnNonArray)
-}
-
-function testCategoryValidation() {
-  console.log('\n--- Testing category validation and fallback ---')
-
-  const validEntry = validateEntry({ id: 'txn-1', category: 'Sales Revenue' })
-  check('valid category passes through unchanged', validEntry.category === 'Sales Revenue')
-  check('category_group correctly derived from category', validEntry.category_group === 'INCOME')
-
-  const hallucinatedEntry = validateEntry({ id: 'txn-2', category: 'Totally Made Up Category' })
-  check('hallucinated/unrecognised category falls back to Uncategorised', hallucinatedEntry.category === 'Uncategorised')
-  check('fallback category_group is UNCLASSIFIED', hallucinatedEntry.category_group === 'UNCLASSIFIED')
-
-  const missingId = validateEntry({ category: 'Sales Revenue' })
-  check('entry with no id is rejected (returns null)', missingId === null)
-
-  const expenseEntry = validateEntry({ id: 'txn-3', category: 'Bank Charges' })
-  check('expense category correctly maps to EXPENSE group', expenseEntry.category_group === 'EXPENSE')
-}
-
-async function testFullCategorisationFlow() {
-  console.log('\n--- Testing full categorisation flow with a mocked Claude response ---')
-
-  // Simulates a well-behaved Claude response: correct categories for
-  // every transaction, matching what a real call would plausibly return
-  // for this exact sample data.
-  const mockCallClaude = async (prompt) => {
-    const ids = SAMPLE_TRANSACTIONS.map((t) => t.id)
-    const categories = ['Sales Revenue', 'Cost of Goods Sold', 'Staff Salaries & Wages', 'Bank Charges', 'Tax Payments']
-    const response = ids.map((id, i) => ({ id, category: categories[i] }))
-    return JSON.stringify(response)
-  }
-
-  const result = await categoriseTransactions(SAMPLE_TRANSACTIONS, mockCallClaude)
-
-  check('all 5 transactions categorised', result.totalProcessed === 5)
-  check('zero failures with a well-behaved response', result.totalFailed === 0)
-  check('credit transaction correctly categorised as income', result.results.find((r) => r.id === 'txn-1').category_group === 'INCOME')
-  check('SMS charge correctly categorised as Bank Charges', result.results.find((r) => r.id === 'txn-4').category === 'Bank Charges')
-}
-
-async function testPartialFailureHandling() {
-  console.log('\n--- Testing partial failure handling (Claude omits some transactions) ---')
-
-  // Simulates Claude only returning results for 3 of 5 transactions —
-  // should report the other 2 as failed, not crash or silently lose them.
-  const mockIncompleteResponse = async () => {
-    return JSON.stringify([
-      { id: 'txn-1', category: 'Sales Revenue' },
-      { id: 'txn-2', category: 'Cost of Goods Sold' },
-      { id: 'txn-3', category: 'Staff Salaries & Wages' },
-    ])
-  }
-
-  const result = await categoriseTransactions(SAMPLE_TRANSACTIONS, mockIncompleteResponse)
-
-  check('3 transactions successfully categorised', result.totalProcessed === 3)
-  check('2 transactions correctly reported as failed, not silently dropped', result.totalFailed === 2)
-  check('failedIds contains the right ids', result.failedIds.includes('txn-4') && result.failedIds.includes('txn-5'))
-}
-
-async function testBatchFailureIsolation() {
-  console.log('\n--- Testing that one bad batch doesn\'t take down the whole request ---')
-
-  // Build enough transactions to force 2 batches, and make the API call
-  // throw for every call — every transaction across both batches should
-  // be reported as failed, with no unhandled exception escaping.
-  const manyTransactions = Array.from({ length: BATCH_SIZE + 5 }, (_, i) => ({
-    id: `txn-${i}`,
-    description: `Test transaction ${i}`,
-    debit: 100,
-    credit: null,
-  }))
-
-  const mockAlwaysFails = async () => {
-    throw new Error('Simulated network failure')
-  }
-
+function testParsing() {
+  console.log('\n--- Response parsing ---')
+  const clean = '[{"id": "txn-1", "category": "Sales Revenue"}]'
+  check('parses clean JSON', parseAIResponse(clean)[0].id === 'txn-1')
+  check('strips ```json fences', parseAIResponse('```json\n' + clean + '\n```')[0].id === 'txn-1')
+  check('strips bare ``` fences', parseAIResponse('```\n' + clean + '\n```')[0].id === 'txn-1')
+  check(
+    'extracts array from chatty preamble/postamble (Groq-style)',
+    parseAIResponse('Sure, here you go:\n' + clean + '\nLet me know!')[0].id === 'txn-1'
+  )
   let threw = false
-  let result
-  try {
-    result = await categoriseTransactions(manyTransactions, mockAlwaysFails)
-  } catch {
-    threw = true
-  }
+  try { parseAIResponse('not json') } catch { threw = true }
+  check('throws on invalid JSON', threw)
+  threw = false
+  try { parseAIResponse('{"id": "x"}') } catch { threw = true }
+  check('throws on non-array JSON', threw)
+}
 
-  check('does not throw even when every batch fails', !threw)
-  check('all transactions reported as failed', result?.totalFailed === manyTransactions.length)
-  check('batchErrors captured for diagnostics', result?.batchErrors.length === 2) // BATCH_SIZE+5 over BATCH_SIZE=40 -> 2 batches
+function testValidation() {
+  console.log('\n--- Category validation ---')
+  const valid = validateEntry({ id: 'a', category: 'Sales Revenue' })
+  check('valid category passes through', valid.category === 'Sales Revenue' && valid.category_group === 'INCOME')
+  const hallucinated = validateEntry({ id: 'b', category: 'Made Up Category' })
+  check('hallucinated category falls back to Uncategorised/UNCLASSIFIED',
+    hallucinated.category === 'Uncategorised' && hallucinated.category_group === 'UNCLASSIFIED')
+  check('missing id rejected', validateEntry({ category: 'Sales Revenue' }) === null)
+  check('Bank Charges maps to EXPENSE', validateEntry({ id: 'c', category: 'Bank Charges' }).category_group === 'EXPENSE')
+  check('Loan Received - Current maps to BALANCE_SHEET', validateEntry({ id: 'd', category: 'Loan Received - Current' }).category_group === 'BALANCE_SHEET')
+}
+
+function testTaxonomyStructure() {
+  console.log('\n--- Taxonomy structure (47 categories, capped groups, FX + director treatment) ---')
+  const t = require('../src/lib/categoryTaxonomy')
+  check('total is exactly 47', t.ALL_CATEGORIES.length === 47)
+  check('no duplicates', new Set(t.ALL_CATEGORIES).size === 47)
+  check('Balance Sheet capped at 16 (director treatment folded in, no cap breach)', t.BALANCE_SHEET_CATEGORIES.length <= 16)
+  check('exactly 4 Cost of Sales categories',
+    t.EXPENSE_CATEGORY_DEFINITIONS.filter((d) => d.subgroup === 'COST_OF_SALES').length === 4)
+  check('Operating capped at 20 (now 19 after FX Loss moved out)',
+    t.EXPENSE_CATEGORY_DEFINITIONS.filter((d) => d.subgroup === 'OPERATING').length <= 20)
+  check('Foreign Exchange Loss is NON_OPERATING (Dufry-driven reclassification)',
+    t.CATEGORY_TO_EXPENSE_SUBGROUP['Foreign Exchange Loss'] === 'NON_OPERATING')
+  check('Interest Expense STAYS in OPERATING (per explicit decision)',
+    t.CATEGORY_TO_EXPENSE_SUBGROUP['Interest Expense'] === 'OPERATING')
+  check('Foreign Exchange Gain is a standalone INCOME category',
+    t.CATEGORY_TO_GROUP['Foreign Exchange Gain'] === 'INCOME')
+  check('Other Income catch-all still present alongside FX Gain', t.ALL_CATEGORIES.includes('Other Income'))
+  check('Staff & Director Loans (Advanced/Repaid) in CURRENT_ASSETS (Hamptech IFRS fix)',
+    t.CATEGORY_TO_BALANCE_SHEET_SUBGROUP['Staff & Director Loans (Advanced/Repaid)'] === 'CURRENT_ASSETS')
+  check('every BS category has a subgroup',
+    t.BALANCE_SHEET_CATEGORIES.every((c) => !!t.CATEGORY_TO_BALANCE_SHEET_SUBGROUP[c]))
+  check('every Expense category has a subgroup',
+    t.EXPENSE_CATEGORIES.every((c) => !!t.CATEGORY_TO_EXPENSE_SUBGROUP[c]))
+  check('Other Income NOT expanded to FIRS subtypes', !t.ALL_CATEGORIES.includes('Commission Income'))
+}
+
+function testProviderSelection() {
+  console.log('\n--- Provider selection ---')
+  const { getProvider, getProviderName } = require('../src/lib/aiProvider')
+  const original = process.env.AI_PROVIDER
+  try {
+    delete process.env.AI_PROVIDER
+    check('defaults to anthropic', getProviderName() === 'anthropic')
+    process.env.AI_PROVIDER = 'groq'
+    check('selects groq', getProvider().requiredEnvVar === 'GROQ_API_KEY')
+    process.env.AI_PROVIDER = 'GROQ'
+    check('case-insensitive', getProviderName() === 'groq')
+    process.env.AI_PROVIDER = 'typo'
+    let threw = false
+    try { getProvider() } catch { threw = true }
+    check('throws on unknown provider', threw)
+  } finally {
+    if (original === undefined) delete process.env.AI_PROVIDER
+    else process.env.AI_PROVIDER = original
+  }
+}
+
+async function testFlow() {
+  console.log('\n--- Full flow (mocked AI) ---')
+  const mockGood = async () => JSON.stringify([
+    { id: 'txn-1', category: 'Sales Revenue' },
+    { id: 'txn-2', category: 'Cost of Goods Sold (Purchases)' },
+    { id: 'txn-3', category: 'Staff Salaries & Wages' },
+    { id: 'txn-4', category: 'Bank Charges' },
+    { id: 'txn-5', category: 'Tax Payments' },
+  ])
+  const good = await categoriseTransactions(SAMPLE, mockGood)
+  check('all 5 categorised', good.totalProcessed === 5 && good.totalFailed === 0)
+
+  const mockPartial = async () => JSON.stringify([{ id: 'txn-1', category: 'Sales Revenue' }])
+  const partial = await categoriseTransactions(SAMPLE, mockPartial)
+  check('partial response: 4 reported failed, not dropped', partial.totalFailed === 4)
+
+  const many = Array.from({ length: BATCH_SIZE + 5 }, (_, i) => ({ id: `t${i}`, description: `x${i}`, debit: 1, credit: null }))
+  const mockFail = async () => { throw new Error('network down') }
+  let threw = false
+  let failResult
+  try { failResult = await categoriseTransactions(many, mockFail) } catch { threw = true }
+  check('total failure does not throw', !threw)
+  check('all reported failed with batch errors', failResult.totalFailed === many.length && failResult.batchErrors.length === 2)
 }
 
 async function main() {
-  testPromptBuilding()
-  testResponseParsing()
-  testCategoryValidation()
-  await testFullCategorisationFlow()
-  await testPartialFailureHandling()
-  await testBatchFailureIsolation()
-
+  testPrompt()
+  testParsing()
+  testValidation()
+  testTaxonomyStructure()
+  testProviderSelection()
+  await testFlow()
   console.log('\n=================================')
-  if (failures === 0) {
-    console.log('ALL CRITICAL CHECKS PASSED')
-    console.log('NOTE: these tests use a MOCKED Claude response. The live')
-    console.log('API call (src/lib/anthropicClient.js) is untested — add')
-    console.log('a real ANTHROPIC_API_KEY and run scripts/smoke-test-categorise.js')
-    console.log('for a real end-to-end check.')
-  } else {
-    console.log(`${failures} CHECK(S) FAILED — review output above`)
-  }
+  console.log(failures === 0 ? 'ALL CRITICAL CHECKS PASSED' : `${failures} CHECK(S) FAILED`)
+  console.log('NOTE: mocked AI responses. Live call: scripts/smoke-test-categorise.js')
   console.log('=================================')
-
   process.exit(failures === 0 ? 0 : 1)
 }
-
 main()

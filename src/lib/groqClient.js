@@ -1,21 +1,10 @@
 /**
- * Groq client — a free alternative to Anthropic while ANTHROPIC_API_KEY's
- * account has no funded credits. Groq's API is OpenAI-compatible, so this
- * is a plain fetch() call, no SDK needed.
- *
- * Matches the same contract as anthropicClient.js's callClaude(prompt):
- * takes a prompt string, returns the model's text response string, throws
- * on failure. This is what makes swapping providers a one-line env var
- * change instead of a rewrite — see aiProvider.js.
- *
- * Get a free key from console.groq.com (no card required for the free tier
- * at time of writing — check Groq's current docs/limits, since free-tier
- * terms can change).
+ * Groq client — free alternative while the Anthropic account has no
+ * funded credits. OpenAI-compatible API, plain fetch, no SDK. Same
+ * contract as anthropicClient.js: prompt in, text out, throws on failure.
+ * Free key: console.groq.com.
  */
 
-// Llama 3.3 70B — a strong general-purpose open-weight model, well suited
-// to a structured classification task like this. If categorisation
-// quality isn't good enough, this is the first thing to try changing.
 const GROQ_MODEL = 'llama-3.3-70b-versatile'
 
 async function callGroq(prompt) {
@@ -35,7 +24,7 @@ async function callGroq(prompt) {
       model: GROQ_MODEL,
       messages: [{ role: 'user', content: prompt }],
       max_tokens: 4096,
-      temperature: 0, // deterministic-leaning for a classification task, not creative writing
+      temperature: 0,
     }),
   })
 
