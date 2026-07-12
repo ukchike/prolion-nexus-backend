@@ -1,0 +1,287 @@
+{
+  "info": {
+    "name": "NEXUS Stage 1 - Backend APIs",
+    "description": "Manual Transactions, VAT Toggle, Dashboard Aggregation, Opening Balances",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{BASE_URL}}/health",
+          "host": ["{{BASE_URL}}"],
+          "path": ["health"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Manual Transactions",
+      "item": [
+        {
+          "name": "Create Manual Transaction (Expense)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{USER_TOKEN}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"date\": \"2024-07-12\",\n  \"narration\": \"Office supplies from local vendor\",\n  \"amount\": 5000,\n  \"type\": \"expense\",\n  \"category\": \"Office Supplies\",\n  \"is_vat_inclusive\": false,\n  \"notes\": \"Monthly office supply purchase\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/transactions/manual",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "transactions", "manual"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Manual Transaction (Income with VAT)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{USER_TOKEN}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"date\": \"2024-07-10\",\n  \"narration\": \"Sales invoice #001 to ABC Corp\",\n  \"amount\": 10750,\n  \"type\": \"income\",\n  \"category\": \"Sales Revenue\",\n  \"is_vat_inclusive\": true,\n  \"notes\": \"Professional services rendered\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/transactions/manual",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "transactions", "manual"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Manual Transaction (Asset)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{USER_TOKEN}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"date\": \"2024-07-05\",\n  \"narration\": \"Purchase of laptop computer\",\n  \"amount\": 250000,\n  \"type\": \"asset\",\n  \"category\": \"Fixed Assets\",\n  \"is_vat_inclusive\": true,\n  \"notes\": \"Dell XPS 15 laptop for office use\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/transactions/manual",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "transactions", "manual"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "VAT Toggle",
+      "item": [
+        {
+          "name": "Toggle VAT - Enable",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{USER_TOKEN}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"is_vat_inclusive\": true\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/transactions/{{TRANSACTION_ID}}/vat-toggle",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "transactions", "{{TRANSACTION_ID}}", "vat-toggle"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Toggle VAT - Disable",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{USER_TOKEN}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"is_vat_inclusive\": false\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/transactions/{{TRANSACTION_ID}}/vat-toggle",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "transactions", "{{TRANSACTION_ID}}", "vat-toggle"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Dashboard Metrics",
+      "item": [
+        {
+          "name": "Get Aggregated Metrics (All-time)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{USER_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/api/dashboard/aggregated",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "dashboard", "aggregated"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Aggregated Metrics (Date Range)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{USER_TOKEN}}"
+              }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/api/dashboard/aggregated?start_date=2024-01-01&end_date=2024-07-31",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "dashboard", "aggregated"],
+              "query": [
+                {
+                  "key": "start_date",
+                  "value": "2024-01-01"
+                },
+                {
+                  "key": "end_date",
+                  "value": "2024-07-31"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Opening Balances",
+      "item": [
+        {
+          "name": "Save Opening Balances (Complete)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{USER_TOKEN}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"start_date\": \"2024-01-01\",\n  \"assets\": {\n    \"cash_at_bank\": 500000,\n    \"fixed_assets\": 1000000,\n    \"inventory\": 200000,\n    \"other_assets\": 50000\n  },\n  \"liabilities\": {\n    \"bank_loans\": 250000,\n    \"other_payables\": 50000\n  },\n  \"equity\": {\n    \"retained_earnings\": 0,\n    \"owner_capital\": 1450000\n  }\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/opening-balances",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "opening-balances"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Save Opening Balances (Minimal)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{USER_TOKEN}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"start_date\": \"2024-07-12\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/opening-balances",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "opening-balances"]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "BASE_URL",
+      "value": "http://localhost:4000",
+      "type": "string"
+    },
+    {
+      "key": "USER_TOKEN",
+      "value": "your-jwt-token-here",
+      "type": "string"
+    },
+    {
+      "key": "TRANSACTION_ID",
+      "value": "transaction-uuid-here",
+      "type": "string"
+    }
+  ]
+}
