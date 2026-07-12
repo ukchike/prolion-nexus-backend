@@ -4,65 +4,12 @@
  */
 
 const { z } = require('zod');
+const { ALL_CATEGORIES, CATEGORY_TO_GROUP } = require('./categoryTaxonomy');
 
-// Category validation against NEXUS taxonomy
-const VALID_CATEGORIES = [
-  // Income (4)
-  'Sales Revenue',
-  'Service Income',
-  'Investment Income',
-  'Other Income',
-
-  // Cost of Sales (4)
-  'Cost of Goods Sold',
-  'Materials & Supplies',
-  'Direct Labour',
-  'Manufacturing Overhead',
-
-  // Operating Expenses (20)
-  'Salaries & Wages',
-  'Rent & Utilities',
-  'Office Supplies',
-  'Transportation',
-  'Meals & Entertainment',
-  'Advertising & Marketing',
-  'Professional Services',
-  'Insurance',
-  'Repairs & Maintenance',
-  'Depreciation',
-  'Phone & Internet',
-  'Travel',
-  'Training & Development',
-  'Subscriptions & Software',
-  'Bank Charges & Fees',
-  'Interest Expense',
-  'Donations & CSR',
-  'Fines & Penalties',
-  'Miscellaneous Expense',
-  'Owner Drawings',
-
-  // Balance Sheet (16)
-  'Cash at Bank',
-  'Cash on Hand',
-  'Accounts Receivable',
-  'Inventory',
-  'Prepaid Expenses',
-  'Fixed Assets',
-  'Accumulated Depreciation',
-  'Intangible Assets',
-  'Accounts Payable',
-  'Tax Payable',
-  'Loans Payable',
-  'Accrued Expenses',
-  'Owner Equity',
-  'Retained Earnings',
-  'Capital Contribution',
-  'Loans Receivable',
-
-  // Special
-  'Transfer',
-  'Unclassified',
-];
+// Category validation against the real NEXUS taxonomy (categoryTaxonomy.js
+// is the single source of truth — mirrored on the frontend in
+// src/lib/categoryOptions.js). Do not hardcode a separate list here.
+const VALID_CATEGORIES = ALL_CATEGORIES;
 
 const TRANSACTION_TYPES = ['income', 'expense', 'asset', 'liability', 'equity', 'transfer'];
 

@@ -4,6 +4,7 @@
  */
 
 const https = require('https');
+const { CATEGORY_TO_GROUP } = require('./categoryTaxonomy');
 
 class SupabaseClient {
   constructor(projectId, anonKey) {
@@ -220,30 +221,11 @@ class SupabaseClient {
   }
 
   /**
-   * Map category name to category_group
+   * Map category name to category_group using the real taxonomy
+   * (categoryTaxonomy.js is the single source of truth).
    */
   mapCategoryToGroup(category) {
-    const incomeCategories = ['Sales Revenue', 'Service Income', 'Investment Income', 'Other Income'];
-    const expenseCategories = [
-      'Cost of Goods Sold', 'Materials & Supplies', 'Direct Labour', 'Manufacturing Overhead',
-      'Salaries & Wages', 'Rent & Utilities', 'Office Supplies', 'Transportation',
-      'Meals & Entertainment', 'Advertising & Marketing', 'Professional Services', 'Insurance',
-      'Repairs & Maintenance', 'Depreciation', 'Phone & Internet', 'Travel',
-      'Training & Development', 'Subscriptions & Software', 'Bank Charges & Fees', 'Interest Expense',
-      'Donations & CSR', 'Fines & Penalties', 'Miscellaneous Expense', 'Owner Drawings',
-    ];
-    const balanceSheetCategories = [
-      'Cash at Bank', 'Cash on Hand', 'Accounts Receivable', 'Inventory', 'Prepaid Expenses',
-      'Fixed Assets', 'Accumulated Depreciation', 'Intangible Assets', 'Accounts Payable',
-      'Tax Payable', 'Loans Payable', 'Accrued Expenses', 'Owner Equity', 'Retained Earnings',
-      'Capital Contribution', 'Loans Receivable',
-    ];
-
-    if (incomeCategories.includes(category)) return 'INCOME';
-    if (expenseCategories.includes(category)) return 'EXPENSE';
-    if (balanceSheetCategories.includes(category)) return 'BALANCE_SHEET';
-    if (category === 'Transfer') return 'TRANSFER';
-    return 'UNCLASSIFIED';
+    return CATEGORY_TO_GROUP[category] || 'UNCLASSIFIED';
   }
 }
 

@@ -33,7 +33,7 @@ test('accepts valid manual transaction', () => {
     narration: 'Office supplies purchase',
     amount: 5000,
     type: 'expense',
-    category: 'Office Supplies',
+    category: 'Office Supplies & Stationery',
     is_vat_inclusive: false,
   };
   const result = validateInput(ManualTransactionSchema, input);
@@ -61,7 +61,7 @@ test('accepts manual transaction with optional notes', () => {
     narration: 'Monthly retainer payment',
     amount: 50000,
     type: 'expense',
-    category: 'Professional Services',
+    category: 'Professional & Audit Fees',
     is_vat_inclusive: true,
     notes: 'Monthly consulting agreement',
   };
@@ -74,7 +74,7 @@ test('rejects transaction with missing date', () => {
     narration: 'Invalid transaction',
     amount: 1000,
     type: 'expense',
-    category: 'Office Supplies',
+    category: 'Office Supplies & Stationery',
   };
   const result = validateInput(ManualTransactionSchema, input);
   assert(!result.success, 'Should reject missing date');
@@ -86,7 +86,7 @@ test('rejects transaction with invalid date', () => {
     narration: 'Invalid date transaction',
     amount: 1000,
     type: 'expense',
-    category: 'Office Supplies',
+    category: 'Office Supplies & Stationery',
   };
   const result = validateInput(ManualTransactionSchema, input);
   assert(!result.success, 'Should reject invalid date');
@@ -98,7 +98,7 @@ test('rejects transaction with negative amount', () => {
     narration: 'Negative amount',
     amount: -1000,
     type: 'expense',
-    category: 'Office Supplies',
+    category: 'Office Supplies & Stationery',
   };
   const result = validateInput(ManualTransactionSchema, input);
   assert(!result.success, 'Should reject negative amount');
@@ -110,7 +110,7 @@ test('rejects transaction with zero amount', () => {
     narration: 'Zero amount',
     amount: 0,
     type: 'expense',
-    category: 'Office Supplies',
+    category: 'Office Supplies & Stationery',
   };
   const result = validateInput(ManualTransactionSchema, input);
   assert(!result.success, 'Should reject zero amount');
@@ -122,7 +122,7 @@ test('rejects invalid transaction type', () => {
     narration: 'Invalid type',
     amount: 1000,
     type: 'invalid_type',
-    category: 'Office Supplies',
+    category: 'Office Supplies & Stationery',
   };
   const result = validateInput(ManualTransactionSchema, input);
   assert(!result.success, 'Should reject invalid type');
@@ -146,7 +146,7 @@ test('rejects narration too short', () => {
     narration: 'AB',
     amount: 1000,
     type: 'expense',
-    category: 'Office Supplies',
+    category: 'Office Supplies & Stationery',
   };
   const result = validateInput(ManualTransactionSchema, input);
   assert(!result.success, 'Should reject too-short narration');
@@ -158,7 +158,7 @@ test('rejects narration too long', () => {
     narration: 'A'.repeat(501),
     amount: 1000,
     type: 'expense',
-    category: 'Office Supplies',
+    category: 'Office Supplies & Stationery',
   };
   const result = validateInput(ManualTransactionSchema, input);
   assert(!result.success, 'Should reject too-long narration');
@@ -231,7 +231,7 @@ test('rejects invalid date in opening balances', () => {
 });
 
 // All valid income categories
-const incomeCategories = ['Sales Revenue', 'Service Income', 'Investment Income', 'Other Income'];
+const incomeCategories = ['Sales Revenue', 'Service Income', 'Rental Income', 'Foreign Exchange Gain', 'Other Income'];
 test('accepts all income categories', () => {
   incomeCategories.forEach((cat) => {
     const input = {
