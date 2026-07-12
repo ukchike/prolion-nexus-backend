@@ -6,8 +6,23 @@
  */
 
 const GROQ_MODEL = 'llama-3.3-70b-versatile'
+const MAX_RETRIES = 3
 
-async function callGroq(prompt) {
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+// Groq's 429 body names the exact wait ("Please try again in 5.46s") since
+// the free on-demand tier's tokens-per-minute budget refills continuously
+// rather than resetting on the clock minute — honor that instead of
+// guessing a backoff, and pad it slightly since the quoted figure is a
+// lower bound.
+function parseRetryAfterMs(errorBody) {
+  const match = errorBody.match(/try again in ([\d.]+)s/i)
+  return match ? Math.ceil(parseFloat(match[1]) * 1000) + 500 : null
+}
+
+async function callGroq(prompt, attempt = 1) {
   if (!process.env.GROQ_API_KEY) {
     throw new Error(
       'GROQ_API_KEY is not set. Get a free key from console.groq.com and add it to your .env (locally) or Railway environment variables (deployed).'
@@ -30,6 +45,13 @@ async function callGroq(prompt) {
 
   if (!response.ok) {
     const errorBody = await response.text().catch(() => '')
+
+    if (response.status === 429 && attempt <= MAX_RETRIES) {
+      const retryAfterMs = parseRetryAfterMs(errorBody) ?? attempt * 2000
+      await sleep(retryAfterMs)
+      return callGroq(prompt, attempt + 1)
+    }
+
     throw new Error(`Groq API error (HTTP ${response.status}): ${errorBody.slice(0, 300)}`)
   }
 
