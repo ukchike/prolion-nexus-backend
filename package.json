@@ -6,7 +6,10 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "test": "node test/parser.test.js && node test/categorise.test.js"
+    "test": "node test/parser.test.js && node test/categorise.test.js && node test/narrationCleaner.test.js && node test/vatCalculator.test.js && node test/validationSchemas.test.js",
+    "test:narration": "node test/narrationCleaner.test.js",
+    "test:vat": "node test/vatCalculator.test.js",
+    "test:validation": "node test/validationSchemas.test.js"
   },
   "license": "ISC",
   "dependencies": {
@@ -17,7 +20,8 @@
     "multer": "^2.2.0",
     "papaparse": "^5.5.4",
     "pdf-parse": "^2.4.5",
-    "@anthropic-ai/sdk": "^0.39.0"
+    "@anthropic-ai/sdk": "^0.39.0",
+    "zod": "^3.22.4"
   },
   "devDependencies": {
     "nodemon": "^3.1.14",
