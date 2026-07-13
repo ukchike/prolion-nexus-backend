@@ -4,9 +4,17 @@ const cors = require('cors')
 const statementsRouter = require('./routes/statements')
 const categoriseRouter = require('./routes/categorise')
 const transactionsRouter = require('./routes/transactions')
+const { generalLimiter } = require('./middleware/rateLimiters')
 
 const app = express()
 const PORT = process.env.PORT || 4000
+
+// Railway (and most PaaS hosts) sit the app behind a reverse proxy —
+// without this, req.ip resolves to the proxy's own address, and every
+// caller would share one rate-limit bucket. Trusting exactly one hop
+// (the platform's own edge, not arbitrary client-supplied headers) is
+// the standard-practice setting for this deployment shape.
+app.set('trust proxy', 1)
 
 const rawAllowedOrigins = [
   'http://localhost:5173',
@@ -45,6 +53,7 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', service: 'nexus-backend', timestamp: new Date().toISOString() })
 })
 
+app.use('/api', generalLimiter)
 app.use('/api', statementsRouter)
 app.use('/api', categoriseRouter)
 app.use('/api/transactions', transactionsRouter)
