@@ -105,6 +105,12 @@ const BALANCE_SHEET_CATEGORY_DEFINITIONS = [
   // 'Loan Received - Current' as a related-party loan. IAS 24 separate
   // disclosure happens at statement level, recoverable from description.
   { name: 'Intercompany Receivable', subgroup: BALANCE_SHEET_SUBGROUPS.CURRENT_ASSETS },
+  // Paired with 'Trade Receivables Collected' below — Recognized is the
+  // debit leg booked when an accrual-basis invoice is approved (money
+  // owed by the customer increases); Collected is the credit leg booked
+  // when that money is actually received, same pairing convention as
+  // Loan Received / Loan Repayment.
+  { name: 'Trade Receivable Recognized', subgroup: BALANCE_SHEET_SUBGROUPS.CURRENT_ASSETS },
   { name: 'Trade Receivables Collected', subgroup: BALANCE_SHEET_SUBGROUPS.CURRENT_ASSETS },
   { name: 'Prepaid Expenses', subgroup: BALANCE_SHEET_SUBGROUPS.CURRENT_ASSETS },
 
@@ -209,6 +215,7 @@ const CATEGORY_METADATA = {
   'Security Deposit Paid/Refund': { deductible: null, vatTreatment: 'not_applicable' },
   'Staff & Director Loans (Advanced/Repaid)': { deductible: null, vatTreatment: 'not_applicable' },
   'Intercompany Receivable': { deductible: null, vatTreatment: 'not_applicable' },
+  'Trade Receivable Recognized': { deductible: null, vatTreatment: 'not_applicable' },
   'Trade Receivables Collected': { deductible: null, vatTreatment: 'not_applicable' },
   'Prepaid Expenses': { deductible: null, vatTreatment: 'not_applicable' },
   'Customer Advance / Deposit Received': { deductible: null, vatTreatment: 'not_applicable' },

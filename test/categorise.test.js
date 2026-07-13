@@ -78,11 +78,11 @@ function testValidation() {
 }
 
 function testTaxonomyStructure() {
-  console.log('\n--- Taxonomy structure (47 categories, capped groups, FX + director treatment) ---')
+  console.log('\n--- Taxonomy structure (48 categories, capped groups, FX + director treatment) ---')
   const t = require('../src/lib/categoryTaxonomy')
-  check('total is exactly 47', t.ALL_CATEGORIES.length === 47)
-  check('no duplicates', new Set(t.ALL_CATEGORIES).size === 47)
-  check('Balance Sheet capped at 16 (director treatment folded in, no cap breach)', t.BALANCE_SHEET_CATEGORIES.length <= 16)
+  check('total is exactly 48', t.ALL_CATEGORIES.length === 48)
+  check('no duplicates', new Set(t.ALL_CATEGORIES).size === 48)
+  check('Balance Sheet capped at 17 (Trade Receivable Recognized added for Sales module accrual)', t.BALANCE_SHEET_CATEGORIES.length <= 17)
   check('exactly 4 Cost of Sales categories',
     t.EXPENSE_CATEGORY_DEFINITIONS.filter((d) => d.subgroup === 'COST_OF_SALES').length === 4)
   check('Operating capped at 20 (now 19 after FX Loss moved out)',
