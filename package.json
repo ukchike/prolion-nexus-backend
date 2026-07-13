@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "test": "node test/parser.test.js && node test/categorise.test.js && node test/narrationCleaner.test.js && node test/vatCalculator.test.js && node test/validationSchemas.test.js && node test/requireAuth.test.js",
+    "test": "node test/parser.test.js && node test/categorise.test.js && node test/narrationCleaner.test.js && node test/vatCalculator.test.js && node test/validationSchemas.test.js && node test/requireAuth.test.js && node test/assistant.test.js",
     "test:narration": "node test/narrationCleaner.test.js",
     "test:vat": "node test/vatCalculator.test.js",
     "test:validation": "node test/validationSchemas.test.js"

@@ -4,6 +4,7 @@ const cors = require('cors')
 const statementsRouter = require('./routes/statements')
 const categoriseRouter = require('./routes/categorise')
 const transactionsRouter = require('./routes/transactions')
+const assistantRouter = require('./routes/assistant')
 const { generalLimiter } = require('./middleware/rateLimiters')
 
 const app = express()
@@ -56,6 +57,7 @@ app.get('/health', (req, res) => {
 app.use('/api', generalLimiter)
 app.use('/api', statementsRouter)
 app.use('/api', categoriseRouter)
+app.use('/api', assistantRouter)
 app.use('/api/transactions', transactionsRouter)
 
 app.use((req, res) => {

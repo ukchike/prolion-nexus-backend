@@ -19,7 +19,14 @@ function getClient() {
 // proves unsatisfactory on real data.
 const MODEL = 'claude-haiku-4-5-20251001'
 
-async function callClaude(prompt) {
+/**
+ * `options.messages`/`options.system` support the multi-turn AI
+ * Assistant (assistantEngine.js) alongside the categorisation engine's
+ * plain single-string prompt — categorisation call sites are untouched
+ * since `options` defaults to {} and falls back to wrapping `prompt` as
+ * a single user turn.
+ */
+async function callClaude(prompt, options = {}) {
   const anthropic = getClient()
   const message = await anthropic.messages.create({
     model: MODEL,
@@ -27,7 +34,8 @@ async function callClaude(prompt) {
     // alongside the category, roughly doubling per-entry response size —
     // 4096 was already snug for a full batch before that addition.
     max_tokens: 6000,
-    messages: [{ role: 'user', content: prompt }],
+    ...(options.system ? { system: options.system } : {}),
+    messages: options.messages || [{ role: 'user', content: prompt }],
   })
 
   const textBlock = message.content.find((block) => block.type === 'text')
