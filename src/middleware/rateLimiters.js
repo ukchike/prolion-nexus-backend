@@ -52,4 +52,17 @@ const parseLimiter = rateLimit({
   message: { error: 'Too many upload requests. Please wait a few minutes and try again.' },
 })
 
-module.exports = { generalLimiter, categoriseLimiter, parseLimiter }
+// Conversational — a legitimate user might ask several questions in one
+// browsing session, so this is looser than categoriseLimiter, but each
+// turn still costs a real AI API call, so it stays well short of
+// generalLimiter's pre-auth backstop.
+const assistantLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 40,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: byUserOrIp,
+  message: { error: 'Too many assistant questions. Please wait a few minutes and try again.' },
+})
+
+module.exports = { generalLimiter, categoriseLimiter, parseLimiter, assistantLimiter }

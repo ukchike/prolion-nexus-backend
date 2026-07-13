@@ -22,12 +22,28 @@ function parseRetryAfterMs(errorBody) {
   return match ? Math.ceil(parseFloat(match[1]) * 1000) + 500 : null
 }
 
-async function callGroq(prompt, attempt = 1) {
+/**
+ * Public entry point — `options.messages`/`options.system` support the
+ * multi-turn AI Assistant (assistantEngine.js) alongside the
+ * categorisation engine's plain single-string prompt. The retry
+ * attempt counter stays internal (attemptGroq) so this signature
+ * matches callClaude's (prompt, options), letting aiProvider.js's
+ * generic `provider.call(prompt, options)` work for either provider.
+ */
+async function callGroq(prompt, options = {}) {
+  return attemptGroq(prompt, options, 1)
+}
+
+async function attemptGroq(prompt, options, attempt) {
   if (!process.env.GROQ_API_KEY) {
     throw new Error(
       'GROQ_API_KEY is not set. Get a free key from console.groq.com and add it to your .env (locally) or Railway environment variables (deployed).'
     )
   }
+
+  const messages = options.system
+    ? [{ role: 'system', content: options.system }, ...(options.messages || [{ role: 'user', content: prompt }])]
+    : options.messages || [{ role: 'user', content: prompt }]
 
   const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
@@ -37,7 +53,7 @@ async function callGroq(prompt, attempt = 1) {
     },
     body: JSON.stringify({
       model: GROQ_MODEL,
-      messages: [{ role: 'user', content: prompt }],
+      messages,
       // Cap only, not a token reservation — actual usage against the free
       // tier's TPM budget still depends on what's actually generated.
       // Raised alongside anthropicClient.js since each result now carries
@@ -53,7 +69,7 @@ async function callGroq(prompt, attempt = 1) {
     if (response.status === 429 && attempt <= MAX_RETRIES) {
       const retryAfterMs = parseRetryAfterMs(errorBody) ?? attempt * 2000
       await sleep(retryAfterMs)
-      return callGroq(prompt, attempt + 1)
+      return attemptGroq(prompt, options, attempt + 1)
     }
 
     throw new Error(`Groq API error (HTTP ${response.status}): ${errorBody.slice(0, 300)}`)
