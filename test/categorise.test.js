@@ -54,6 +54,27 @@ function testValidation() {
   check('missing id rejected', validateEntry({ category: 'Sales Revenue' }) === null)
   check('Bank Charges maps to EXPENSE', validateEntry({ id: 'c', category: 'Bank Charges' }).category_group === 'EXPENSE')
   check('Loan Received - Current maps to BALANCE_SHEET', validateEntry({ id: 'd', category: 'Loan Received - Current' }).category_group === 'BALANCE_SHEET')
+
+  const confident = validateEntry({ id: 'e', category: 'Staff Salaries & Wages', confidence: 97, reason: 'Narration contains SALARY' })
+  check('confidence/reason pass through when present', confident.confidence === 97 && confident.reason === 'Narration contains SALARY')
+  check('metadata attached: salaries are not deductible-N/A but not-VATable', confident.deductible === true && confident.vatTreatment === 'not_applicable')
+
+  const outOfRange = validateEntry({ id: 'f', category: 'Sales Revenue', confidence: 150 })
+  check('confidence clamped to 100', outOfRange.confidence === 100)
+  const negative = validateEntry({ id: 'g', category: 'Sales Revenue', confidence: -20 })
+  check('confidence clamped to 0', negative.confidence === 0)
+
+  const missingConfidence = validateEntry({ id: 'h', category: 'Sales Revenue' })
+  check('missing confidence defaults to a moderate value, not a fabricated high one', missingConfidence.confidence === 60)
+  check('missing reason gets a default, not blank', missingConfidence.reason.length > 0)
+
+  const fabricatedConfidence = validateEntry({ id: 'i', category: 'Not A Real Category', confidence: 99 })
+  check('hallucinated category cannot also claim high confidence', fabricatedConfidence.confidence === 0)
+
+  const nonDeductible = validateEntry({ id: 'j', category: 'Fines & Penalties' })
+  check('Fines & Penalties correctly flagged non-deductible', nonDeductible.deductible === false)
+  const notExpense = validateEntry({ id: 'k', category: 'Loan Received - Current' })
+  check('non-expense category has null (not applicable) deductibility, not false', notExpense.deductible === null)
 }
 
 function testTaxonomyStructure() {

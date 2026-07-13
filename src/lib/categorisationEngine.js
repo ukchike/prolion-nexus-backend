@@ -4,11 +4,19 @@
  * mocked AI response, without a real API key or network call.
  */
 
-const { ALL_CATEGORIES, CATEGORY_TO_GROUP, CATEGORY_GROUPS, UNCLASSIFIED_CATEGORIES } = require('./categoryTaxonomy')
+const { ALL_CATEGORIES, CATEGORY_TO_GROUP, CATEGORY_GROUPS, UNCLASSIFIED_CATEGORIES, metadataForCategory } = require('./categoryTaxonomy')
 
 const FALLBACK_CATEGORY = UNCLASSIFIED_CATEGORIES[0]
-const BATCH_SIZE = 40
+// Smaller than before (was 40) — confidence + reason roughly double each
+// result's size, and this keeps a batch's JSON response comfortably
+// inside max_tokens on both providers rather than risking truncation.
+const BATCH_SIZE = 25
 const MAX_TRANSACTIONS_PER_REQUEST = 1000
+// Applied when the model omits/mangles confidence — moderate rather than
+// high, since a missing confidence is itself a signal the response was
+// malformed and shouldn't be silently presented as trustworthy.
+const DEFAULT_CONFIDENCE = 60
+const DEFAULT_REASON = 'Classified by AI from the transaction description; no specific reason was returned.'
 
 function buildPrompt(transactions) {
   const categoryList = ALL_CATEGORIES.map((c) => `- ${c}`).join('\n')
@@ -58,8 +66,12 @@ Guidance:
 Transactions (format: id | description | amount):
 ${transactionLines}
 
+For each transaction also provide:
+- confidence: an integer 0-100 for how certain you are, given ONLY the narration and amount (no external knowledge of this specific business). Reserve 90+ for narrations that are unambiguous (e.g. explicit "SALARY", "VAT", a named known category keyword); use 50-70 when the narration gives a weak or generic signal; use below 50 when you are essentially guessing.
+- reason: ONE short sentence (under 15 words) grounded in what's actually in the narration — e.g. "Narration contains 'SALARY' and matches payroll wording", not a generic restatement of the category name.
+
 Respond with ONLY a JSON array, no markdown code fences, no explanation, no preamble. Each element must be exactly:
-{"id": "<the id from the input>", "category": "<exact category name from the list above>"}`
+{"id": "<the id from the input>", "category": "<exact category name from the list above>", "confidence": <integer 0-100>, "reason": "<short reason>"}`
 }
 
 /**
@@ -98,7 +110,23 @@ function validateEntry(entry) {
   if (!entry || (typeof entry.id !== 'string' && typeof entry.id !== 'number')) return null
   const category = ALL_CATEGORIES.includes(entry.category) ? entry.category : FALLBACK_CATEGORY
   const category_group = CATEGORY_TO_GROUP[category] || CATEGORY_GROUPS.UNCLASSIFIED
-  return { id: String(entry.id), category, category_group }
+
+  // A hallucinated category is exactly the case where the model's own
+  // confidence claim can't be trusted either — override it rather than
+  // let a fabricated "95% confident" reach the user for a category we
+  // just silently swapped out for Uncategorised.
+  const isFallback = category !== entry.category
+  const rawConfidence = Number(entry.confidence)
+  const confidence = isFallback
+    ? 0
+    : Number.isFinite(rawConfidence) ? Math.max(0, Math.min(100, Math.round(rawConfidence))) : DEFAULT_CONFIDENCE
+  const reason = isFallback
+    ? `"${entry.category}" isn't a recognised category — defaulted to Uncategorised for review.`
+    : (typeof entry.reason === 'string' && entry.reason.trim()) ? entry.reason.trim().slice(0, 200) : DEFAULT_REASON
+
+  const { deductible, vatTreatment } = metadataForCategory(category)
+
+  return { id: String(entry.id), category, category_group, confidence, reason, deductible, vatTreatment, source: 'ai' }
 }
 
 function chunk(array, size) {
