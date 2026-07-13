@@ -1,10 +1,12 @@
 const express = require('express')
 const { categoriseTransactions, MAX_TRANSACTIONS_PER_REQUEST } = require('../lib/categorisationEngine')
 const { getProvider } = require('../lib/aiProvider')
+const { requireAuth } = require('../middleware/requireAuth')
+const { categoriseLimiter } = require('../middleware/rateLimiters')
 
 const router = express.Router()
 
-router.post('/categorise-transactions', async (req, res) => {
+router.post('/categorise-transactions', requireAuth, categoriseLimiter, async (req, res) => {
   try {
     let provider
     try {

@@ -1,6 +1,8 @@
 const express = require('express')
 const multer = require('multer')
 const { parseStatement } = require('../parsers')
+const { requireAuth } = require('../middleware/requireAuth')
+const { parseLimiter } = require('../middleware/rateLimiters')
 
 const router = express.Router()
 
@@ -19,7 +21,7 @@ function detectFileType(file) {
   return null
 }
 
-router.post('/parse-statement', upload.single('file'), async (req, res) => {
+router.post('/parse-statement', requireAuth, parseLimiter, upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded. Send it under the "file" field.' })
