@@ -23,7 +23,10 @@ async function callClaude(prompt) {
   const anthropic = getClient()
   const message = await anthropic.messages.create({
     model: MODEL,
-    max_tokens: 4096,
+    // Each result now carries a confidence score and a short reason
+    // alongside the category, roughly doubling per-entry response size —
+    // 4096 was already snug for a full batch before that addition.
+    max_tokens: 6000,
     messages: [{ role: 'user', content: prompt }],
   })
 

@@ -38,7 +38,11 @@ async function callGroq(prompt, attempt = 1) {
     body: JSON.stringify({
       model: GROQ_MODEL,
       messages: [{ role: 'user', content: prompt }],
-      max_tokens: 4096,
+      // Cap only, not a token reservation — actual usage against the free
+      // tier's TPM budget still depends on what's actually generated.
+      // Raised alongside anthropicClient.js since each result now carries
+      // a confidence score and reason (see categorisationEngine.js).
+      max_tokens: 6000,
       temperature: 0,
     }),
   })

@@ -148,6 +148,86 @@ EXPENSE_CATEGORY_DEFINITIONS.forEach((d) => {
   CATEGORY_TO_EXPENSE_SUBGROUP[d.name] = d.subgroup
 })
 
+/**
+ * Per-category tax metadata — single source of truth for the "Suggested
+ * VAT Treatment" and "Tax Deductibility" fields shown on every
+ * transaction (frontend mirrors this in categoryOptions.js). These are
+ * *suggestions* grounded in the general Nigerian VAT Act and CIT rules,
+ * not a substitute for professional tax advice — VAT treatment in
+ * particular can depend on facts a category name alone can't capture
+ * (e.g. whether specific goods sold are statutorily VAT-exempt).
+ *
+ * deductible: true | false | null (null = not an expense, so CIT
+ * deductibility doesn't apply — income/balance-sheet/transfer lines).
+ * vatTreatment: 'standard' (7.5%) | 'exempt' | 'not_applicable' (not a
+ * supply of goods/services at all — wages, loans, capital, fines, tax
+ * payments) | null (genuinely unknown, e.g. Uncategorised).
+ */
+const CATEGORY_METADATA = {
+  // Income
+  'Sales Revenue': { deductible: null, vatTreatment: 'standard' },
+  'Service Income': { deductible: null, vatTreatment: 'standard' },
+  'Rental Income': { deductible: null, vatTreatment: 'exempt' }, // lease of land/buildings is VAT-exempt
+  'Foreign Exchange Gain': { deductible: null, vatTreatment: 'not_applicable' },
+  'Other Income': { deductible: null, vatTreatment: 'standard' },
+
+  // Cost of Sales
+  'Cost of Goods Sold (Purchases)': { deductible: true, vatTreatment: 'standard' },
+  'Direct Wages': { deductible: true, vatTreatment: 'not_applicable' },
+  'Direct Expenses (incl. Carriage Inwards)': { deductible: true, vatTreatment: 'standard' },
+  'Other Direct Costs': { deductible: true, vatTreatment: 'standard' },
+
+  // Operating expenses
+  'Staff Salaries & Wages': { deductible: true, vatTreatment: 'not_applicable' },
+  "Directors' Remuneration": { deductible: true, vatTreatment: 'not_applicable' },
+  'Staff Welfare, Gratuity & Pension': { deductible: true, vatTreatment: 'not_applicable' },
+  'Rent & Utilities': { deductible: true, vatTreatment: 'exempt' },
+  'Repairs, Security & Cleaning': { deductible: true, vatTreatment: 'standard' },
+  'Transport, Travel & Distribution': { deductible: true, vatTreatment: 'standard' },
+  'Marketing, Advertising & Promotions': { deductible: true, vatTreatment: 'standard' },
+  'Professional & Audit Fees': { deductible: true, vatTreatment: 'standard' },
+  'Government, Regulatory & Statutory Costs': { deductible: true, vatTreatment: 'not_applicable' },
+  'Bank Charges': { deductible: true, vatTreatment: 'exempt' }, // financial services are VAT-exempt
+  'Interest Expense': { deductible: true, vatTreatment: 'not_applicable' },
+  'Tax Payments': { deductible: false, vatTreatment: 'not_applicable' },
+  'Fines & Penalties': { deductible: false, vatTreatment: 'not_applicable' },
+  'Donations': { deductible: false, vatTreatment: 'not_applicable' },
+  'Corporate Social Responsibility': { deductible: false, vatTreatment: 'not_applicable' },
+  'Entertainment Expenses': { deductible: false, vatTreatment: 'standard' },
+  'Training & Development': { deductible: true, vatTreatment: 'standard' },
+  'Office Supplies & Stationery': { deductible: true, vatTreatment: 'standard' },
+  'Other Operating Expenses': { deductible: true, vatTreatment: 'standard' },
+
+  // Non-operating
+  'Foreign Exchange Loss': { deductible: true, vatTreatment: 'not_applicable' },
+
+  // Balance Sheet — not P&L expenses, so deductibility doesn't apply
+  'Capital Introduced': { deductible: null, vatTreatment: 'not_applicable' },
+  'Owner/Director Withdrawal': { deductible: null, vatTreatment: 'not_applicable' },
+  'Dividend Paid': { deductible: null, vatTreatment: 'not_applicable' },
+  'Asset Purchase/Disposal': { deductible: null, vatTreatment: 'standard' },
+  'Security Deposit Paid/Refund': { deductible: null, vatTreatment: 'not_applicable' },
+  'Staff & Director Loans (Advanced/Repaid)': { deductible: null, vatTreatment: 'not_applicable' },
+  'Intercompany Receivable': { deductible: null, vatTreatment: 'not_applicable' },
+  'Trade Receivables Collected': { deductible: null, vatTreatment: 'not_applicable' },
+  'Prepaid Expenses': { deductible: null, vatTreatment: 'not_applicable' },
+  'Customer Advance / Deposit Received': { deductible: null, vatTreatment: 'not_applicable' },
+  'Loan Received - Current': { deductible: null, vatTreatment: 'not_applicable' },
+  'Loan Repayment - Principal (Current)': { deductible: null, vatTreatment: 'not_applicable' },
+  'Intercompany Payable': { deductible: null, vatTreatment: 'not_applicable' },
+  'Trade Payables Settled': { deductible: null, vatTreatment: 'not_applicable' },
+  'Loan Received - Non-current': { deductible: null, vatTreatment: 'not_applicable' },
+  'Loan Repayment - Principal (Non-current)': { deductible: null, vatTreatment: 'not_applicable' },
+
+  // Transfer / Unclassified
+  'Inter-account Transfer': { deductible: null, vatTreatment: 'not_applicable' },
+  'Uncategorised': { deductible: null, vatTreatment: null },
+}
+
+function metadataForCategory(category) {
+  return CATEGORY_METADATA[category] || { deductible: null, vatTreatment: null }
+}
+
 module.exports = {
   CATEGORY_GROUPS,
   BALANCE_SHEET_SUBGROUPS,
@@ -163,4 +243,6 @@ module.exports = {
   CATEGORY_TO_GROUP,
   CATEGORY_TO_BALANCE_SHEET_SUBGROUP,
   CATEGORY_TO_EXPENSE_SUBGROUP,
+  CATEGORY_METADATA,
+  metadataForCategory,
 }
