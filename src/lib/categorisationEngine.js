@@ -5,6 +5,7 @@
  */
 
 const { ALL_CATEGORIES, CATEGORY_TO_GROUP, CATEGORY_GROUPS, UNCLASSIFIED_CATEGORIES, metadataForCategory } = require('./categoryTaxonomy')
+const { cleanNarration, extractMerchantName } = require('./narrationCleaner')
 
 const FALLBACK_CATEGORY = UNCLASSIFIED_CATEGORIES[0]
 // Smaller than before (was 40) — confidence + reason roughly double each
@@ -18,18 +19,39 @@ const MAX_TRANSACTIONS_PER_REQUEST = 1000
 const DEFAULT_CONFIDENCE = 60
 const DEFAULT_REASON = 'Classified by AI from the transaction description; no specific reason was returned.'
 
-function buildPrompt(transactions) {
+/**
+ * @param {object[]} transactions
+ * @param {object} [options]
+ * @param {string} [options.bankName] - shown as context; some narration
+ *   conventions (routing-code formats, settlement-batch phrasing) are
+ *   bank-specific, so naming the bank helps the model calibrate.
+ * @param {string[]} [options.extraRules] - additional classification
+ *   rules from the business's resolved Template Engine selection
+ *   (Business Activities + Operational Modules + Country pack —
+ *   nexus-app's src/templates/resolver.js's `aiRules`), appended after
+ *   the built-in guidance rather than replacing it, so a business with
+ *   no activities/modules selected gets exactly today's prompt.
+ */
+function buildPrompt(transactions, options = {}) {
+  const { bankName, extraRules = [] } = options
   const categoryList = ALL_CATEGORIES.map((c) => `- ${c}`).join('\n')
 
   const transactionLines = transactions
     .map((t) => {
       const movement = t.debit ? `debit ${t.debit}` : t.credit ? `credit ${t.credit}` : 'no amount'
       const description = (t.description || '').slice(0, 200)
-      return `${t.id} | ${description} | ${movement}`
+      const merchant = extractMerchantName(cleanNarration(description))
+      const merchantPart = merchant ? ` | probable merchant: ${merchant}` : ''
+      return `${t.id} | ${description}${merchantPart} | ${movement}`
     })
     .join('\n')
 
-  return `You are categorising transactions from a Nigerian small business bank statement for tax and bookkeeping purposes.
+  const extraRulesBlock = extraRules.length > 0
+    ? `\nAdditional rules for this business (from its selected activities, features, and country):\n${extraRules.map((r) => `- ${r}`).join('\n')}\n`
+    : ''
+
+  return `You are categorising transactions from a Nigerian small business bank statement for tax and bookkeeping purposes.${bankName ? ` The statement is from ${bankName}.` : ''}
+${extraRulesBlock}
 
 Assign EXACTLY ONE category to each transaction from this list (use the exact spelling shown):
 ${categoryList}
@@ -137,8 +159,8 @@ function chunk(array, size) {
   return chunks
 }
 
-async function categoriseBatch(transactions, callAI) {
-  const prompt = buildPrompt(transactions)
+async function categoriseBatch(transactions, callAI, options = {}) {
+  const prompt = buildPrompt(transactions, options)
   const responseText = await callAI(prompt)
   const parsed = parseAIResponse(responseText)
 
@@ -158,7 +180,7 @@ async function categoriseBatch(transactions, callAI) {
   return { results, failedIds }
 }
 
-async function categoriseTransactions(transactions, callAI) {
+async function categoriseTransactions(transactions, callAI, options = {}) {
   if (transactions.length > MAX_TRANSACTIONS_PER_REQUEST) {
     throw new Error(
       `Too many transactions in one request (${transactions.length}). Max is ${MAX_TRANSACTIONS_PER_REQUEST} — split into smaller requests.`
@@ -172,7 +194,7 @@ async function categoriseTransactions(transactions, callAI) {
 
   for (let i = 0; i < batches.length; i++) {
     try {
-      const { results, failedIds } = await categoriseBatch(batches[i], callAI)
+      const { results, failedIds } = await categoriseBatch(batches[i], callAI, options)
       allResults.push(...results)
       allFailedIds.push(...failedIds)
     } catch (err) {

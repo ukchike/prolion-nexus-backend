@@ -2,7 +2,7 @@
  * Narration Cleaner Tests
  */
 
-const { cleanNarration, batchCleanNarrations } = require('../src/lib/narrationCleaner');
+const { cleanNarration, batchCleanNarrations, extractMerchantName } = require('../src/lib/narrationCleaner');
 
 function test(name, fn) {
   try {
@@ -112,6 +112,27 @@ test('handles trace numbers', () => {
   assert(!output.includes('TRACE'), 'Expected TRACE to be removed');
   assert(!output.includes('RRN'), 'Expected RRN to be removed');
   assert(output.includes('settlement'), 'Expected settlement to remain');
+});
+
+test('extracts a probable merchant name, stripping flow words', () => {
+  const cleaned = cleanNarration('TRANSFER FROM DANGOTE AGRO LIMITED');
+  const merchant = extractMerchantName(cleaned);
+  assert(merchant && merchant.toUpperCase().includes('DANGOTE AGRO LIMITED'), `Expected merchant to include DANGOTE AGRO LIMITED, got: ${merchant}`);
+});
+
+test('merchant extraction picks the longest alphabetic run, not a short leftover word', () => {
+  const cleaned = cleanNarration('POS PURCHASE SHOPRITE IKEJA LAGOS VALUE 15000');
+  const merchant = extractMerchantName(cleaned);
+  assert(merchant && merchant.toUpperCase().includes('SHOPRITE'), `Expected merchant to include SHOPRITE, got: ${merchant}`);
+});
+
+test('merchant extraction returns null for a narration with no alphabetic run', () => {
+  assert(extractMerchantName('123456 7890') === null, 'Expected null for a purely numeric narration');
+});
+
+test('merchant extraction returns null for empty/short input', () => {
+  assert(extractMerchantName('') === null, 'Expected null for empty string');
+  assert(extractMerchantName(null) === null, 'Expected null for null');
 });
 
 console.log('\n✅ Narration Cleaner Tests Complete\n');
