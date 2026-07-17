@@ -3,6 +3,7 @@ const multer = require('multer')
 const { parseStatement } = require('../parsers')
 const { requireAuth } = require('../middleware/requireAuth')
 const { parseLimiter } = require('../middleware/rateLimiters')
+const { matchesClaimedType } = require('../lib/fileSignature')
 
 const router = express.Router()
 
@@ -31,6 +32,15 @@ router.post('/parse-statement', requireAuth, parseLimiter, upload.single('file')
     if (!fileType) {
       return res.status(400).json({
         error: `Could not determine file type for "${req.file.originalname}". Expected .pdf, .csv, .xlsx, or .xls.`,
+      })
+    }
+
+    // The filename/Content-Type above are both client-supplied and
+    // trivially spoofable — this confirms the actual bytes match before
+    // handing them to a parser library. See lib/fileSignature.js.
+    if (!matchesClaimedType(req.file.buffer, fileType)) {
+      return res.status(400).json({
+        error: `"${req.file.originalname}" doesn't look like a valid ${fileType.toUpperCase()} file — its content doesn't match its extension. Re-export the statement and try again.`,
       })
     }
 

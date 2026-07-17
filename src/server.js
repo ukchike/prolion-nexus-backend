@@ -3,7 +3,6 @@ const express = require('express')
 const cors = require('cors')
 const statementsRouter = require('./routes/statements')
 const categoriseRouter = require('./routes/categorise')
-const transactionsRouter = require('./routes/transactions')
 const assistantRouter = require('./routes/assistant')
 const { generalLimiter } = require('./middleware/rateLimiters')
 
@@ -58,7 +57,6 @@ app.use('/api', generalLimiter)
 app.use('/api', statementsRouter)
 app.use('/api', categoriseRouter)
 app.use('/api', assistantRouter)
-app.use('/api/transactions', transactionsRouter)
 
 app.use((req, res) => {
   res.status(404).json({ error: `No route for ${req.method} ${req.path}` })
