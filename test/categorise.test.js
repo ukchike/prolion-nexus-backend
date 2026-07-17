@@ -24,6 +24,24 @@ function testPrompt() {
   check('includes every category from the taxonomy', ALL_CATEGORIES.every((c) => prompt.includes(c)))
   check('labels credits correctly', prompt.includes('credit 500000'))
   check('instructs JSON-only response', prompt.toLowerCase().includes('json array'))
+  check('includes a probable merchant name for a transaction that has one',
+    prompt.includes('probable merchant: DANGOTE AGRO LTD') || prompt.toLowerCase().includes('probable merchant'))
+}
+
+function testTemplateAwarePrompt() {
+  console.log('\n--- Template-aware prompt (bank name + extra rules, Phase 7) ---')
+  const withoutOptions = buildPrompt(SAMPLE)
+  check('no bank name mentioned when omitted', !withoutOptions.includes('The statement is from'))
+  check('no extra-rules section when omitted', !withoutOptions.includes('Additional rules for this business'))
+
+  const withOptions = buildPrompt(SAMPLE, {
+    bankName: 'GTBank',
+    extraRules: ['A narration mentioning "PAYSTACK SETTLEMENT" is Sales Revenue, not Bank Charges.'],
+  })
+  check('mentions the bank name when provided', withOptions.includes('The statement is from GTBank'))
+  check('includes the extra rule text when provided', withOptions.includes('PAYSTACK SETTLEMENT'))
+  check('extra rules appear under their own labelled section', withOptions.includes('Additional rules for this business'))
+  check('still includes every category — extra rules are additive, not a replacement', ALL_CATEGORIES.every((c) => withOptions.includes(c)))
 }
 
 function testParsing() {
@@ -151,6 +169,7 @@ async function testFlow() {
 
 async function main() {
   testPrompt()
+  testTemplateAwarePrompt()
   testParsing()
   testValidation()
   testTaxonomyStructure()

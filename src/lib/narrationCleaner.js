@@ -79,7 +79,56 @@ function batchCleanNarrations(narrations) {
   };
 }
 
+// Generic transaction-flow words that surround a merchant/counterparty
+// name without being part of it — stripped before picking the longest
+// remaining word-run as the probable merchant name. Deliberately narrow:
+// removing too aggressively risks eating a real merchant name that
+// happens to contain one of these as a substring word (e.g. a business
+// literally named "Transfer Logistics" would lose "Transfer" here too,
+// which is an acceptable trade-off for a best-effort heuristic feeding
+// the AI prompt as extra context, not a field anything else depends on).
+const FLOW_WORDS = new Set([
+  'TRANSFER', 'FROM', 'TO', 'PAYMENT', 'PURCHASE', 'POS', 'DEBIT', 'CREDIT',
+  'VIA', 'WITHDRAWAL', 'DEPOSIT', 'FOR', 'OF', 'AND', 'THE', 'AT', 'BEING',
+  'VALUE', 'TRANS', 'ONLINE', 'MOBILE', 'USSD', 'WEB', 'CHANNEL', 'A/C', 'ACCT',
+]);
+
+/**
+ * Best-effort extraction of a probable merchant/counterparty name from an
+ * already-cleaned narration — the longest run of consecutive alphabetic
+ * words once generic transaction-flow words are stripped out. Not
+ * authoritative (there's no ground truth to validate against), just an
+ * extra signal handed to the AI categorisation prompt alongside the full
+ * narration — never used as the sole basis for a decision.
+ * @param {string} cleanedNarration - output of cleanNarration()
+ * @returns {string|null} the probable merchant name, or null if nothing
+ *   meaningful survives the strip
+ */
+function extractMerchantName(cleanedNarration) {
+  if (!cleanedNarration || typeof cleanedNarration !== 'string') return null;
+
+  const words = cleanedNarration.split(/\s+/).filter(Boolean);
+  let bestRun = [];
+  let currentRun = [];
+
+  for (const word of words) {
+    const isAlphabetic = /^[A-Za-z][A-Za-z.'-]*$/.test(word);
+    const isFlowWord = FLOW_WORDS.has(word.toUpperCase());
+    if (isAlphabetic && !isFlowWord) {
+      currentRun.push(word);
+      if (currentRun.length > bestRun.length) bestRun = currentRun;
+    } else {
+      currentRun = [];
+    }
+  }
+
+  if (bestRun.length === 0) return null;
+  const merchant = bestRun.join(' ').trim();
+  return merchant.length >= 3 ? merchant : null;
+}
+
 module.exports = {
   cleanNarration,
   batchCleanNarrations,
+  extractMerchantName,
 };
