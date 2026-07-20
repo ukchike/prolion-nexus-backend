@@ -166,10 +166,15 @@ async function categoriseBatch(transactions, callAI, options = {}) {
 
   const requestedIds = new Set(transactions.map((t) => String(t.id)))
   const results = []
+  const seenIds = new Set()
 
   for (const entry of parsed) {
     const validated = validateEntry(entry)
-    if (validated && requestedIds.has(validated.id)) {
+    // Keep only the first entry per id — an LLM response that repeats a
+    // transaction id (hallucination/repetition) would otherwise produce
+    // two categorisation results for one transaction.
+    if (validated && requestedIds.has(validated.id) && !seenIds.has(validated.id)) {
+      seenIds.add(validated.id)
       results.push(validated)
     }
   }

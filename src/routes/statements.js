@@ -1,6 +1,13 @@
 const express = require('express')
 const multer = require('multer')
-const { parseStatement } = require('../parsers')
+const { parseStatement, SUPPORTED_BANKS } = require('../parsers')
+
+// Parsers whose layout assumptions haven't been calibrated against a real
+// export from that bank (see the CALIBRATION NOTICE in parsers/gtb.js) —
+// their results are flagged `unverified: true` in the response so the
+// frontend can warn the user to double-check the figures rather than
+// trusting them the same as a calibrated parser's output.
+const UNVERIFIED_PARSERS = new Set(['gtb'])
 const { requireAuth } = require('../middleware/requireAuth')
 const { parseLimiter } = require('../middleware/rateLimiters')
 const { matchesClaimedType } = require('../lib/fileSignature')
@@ -52,12 +59,22 @@ router.post('/parse-statement', requireAuth, parseLimiter, upload.single('file')
       })
     }
 
+    // Client input validation belongs at the route, not inside the parser
+    // dispatcher — an invalid bankCode is the caller's mistake (400), not
+    // a server failure (500).
+    if (fileType === 'pdf' && !SUPPORTED_BANKS.includes(bankCode.toLowerCase())) {
+      return res.status(400).json({
+        error: `Unsupported bank "${bankCode}". Options: ${SUPPORTED_BANKS.join(', ')} ('auto' covers most Nigerian internet/mobile banking layouts).`,
+      })
+    }
+
     const result = await parseStatement({ buffer: req.file.buffer, fileType, bankCode })
 
     return res.json({
       fileName: req.file.originalname,
       fileType,
       bankCode: bankCode || null,
+      unverified: UNVERIFIED_PARSERS.has(result.parserUsed),
       transactionCount: result.transactions.length,
       unparsedCount: result.unparsedLines.length,
       transactions: result.transactions,

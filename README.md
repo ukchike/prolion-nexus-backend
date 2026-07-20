@@ -4,9 +4,10 @@ Stateless parsing + AI categorisation service for NEXUS by Prolion.
 Deployed on Railway. Never touches Supabase — file/transactions in, structured data out.
 
 ## Endpoints
-- `GET /health`
-- `POST /api/parse-statement` — multipart `file` (+ `bankCode` for PDFs: `access` | `zenith` | `gtb`)
-- `POST /api/categorise-transactions` — `{ transactions: [{id, description, debit, credit}] }`, max 1000/request, batches of 40
+- `GET /health` — liveness + a `config` block reporting whether Supabase/AI-provider env vars are actually set
+- `POST /api/parse-statement` — multipart `file` (+ `bankCode` for PDFs: `auto` | `access` | `zenith` | `gtb`)
+- `POST /api/categorise-transactions` — `{ transactions: [{id, description, debit, credit}] }`, max 1000/request, batches of 25
+- `POST /api/assistant/query` — `{ question, snapshot, history }` → `{ answer, provider }`; answers questions about the caller's own financial data snapshot (see `src/lib/assistantEngine.js`)
 
 ## Parser calibration status
 | Parser | Status |
