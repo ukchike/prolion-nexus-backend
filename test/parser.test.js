@@ -32,6 +32,25 @@ function testAccessReal() {
   check('opening balance row skipped (not a transaction)', !transactions.some((t) => /opening balance/i.test(t.description)))
 }
 
+function testAccessTabFormat() {
+  console.log('\n--- Access Bank (tab-separated internet-banking export) ---')
+  const text = fs.readFileSync(path.join(__dirname, 'fixtures/access-tab-format-sample.txt'), 'utf-8')
+  const { transactions, unparsedLines } = parseAccessText(text)
+  check('4 transactions parsed (opening balance row excluded)', transactions.length === 4)
+  check('no unparsed lines', unparsedLines.length === 0)
+  check('opening balance row skipped (not a transaction)', !transactions.some((t) => /opening balance/i.test(t.description)))
+  check('single-line transaction parsed (levy debit 50)', !!transactions.find((t) => t.debit === 50))
+  check(
+    '3-line wrapped transaction (dates-only header line) parsed with description stitched back together',
+    !!transactions.find((t) => t.debit === 50026.88 && t.description === 'TRF/Chike/FRM ADAEZE CHUKWU TO ADAEZE CHUKWU- C03')
+  )
+  check('single-line credit transaction parsed', !!transactions.find((t) => t.credit === 50000))
+  check(
+    '4-line wrapped transaction (amounts-only trailing line, no leading tab) parsed correctly',
+    !!transactions.find((t) => t.credit === 150000 && t.description === "TRF/18QueensDrive 4thQtr2024AcctgServices/TO ADAEZE CHUKWU FROM OL' MANS COVE VENTURES")
+  )
+}
+
 function testZenithReal() {
   console.log('\n--- Zenith Bank (REAL statement sample) ---')
   const text = fs.readFileSync(path.join(__dirname, 'fixtures/zenith-real-sample.txt'), 'utf-8')
@@ -75,6 +94,7 @@ function testGenericParser() {
 
 testCSV()
 testAccessReal()
+testAccessTabFormat()
 testZenithReal()
 testGenericParser()
 

@@ -1,0 +1,35 @@
+ACCOUNT STATEMENT
+Generated on Monday, July 20, 2026 07:47:28 AM
+Account Details
+Summary
+Statement
+Period:
+Wednesday, January 01, 2025 - Monday, July
+20, 2026
+Currency: 	NGN
+Account
+Name: 	ADAEZE CHUKWU
+Financial Summary
+Account Number: 	1234567890
+Opening Balance: 	836,128.94
+Closing Balance: 	2,682,514.00
+TRANSACTIONS
+Posted Date 	Value Date 	Description 	Debit (NGN) 	Credit (NGN) 	Balance (NGN)
+01-JAN-25 	01-JAN-25 	Opening Balance 	- 	0.00 	836,128.94
+18-JAN-25 	18-JAN-25 	FGN ELECTRONIC MONEY TRANSFER LEVY FOR 1 TXNS AND CHARGE 50 	50.00 	- 	986,078.94
+20-JAN-25 	20-JAN-25
+TRF/Chike/FRM ADAEZE CHUKWU TO
+ADAEZE CHUKWU- C03 	50,026.88 	- 	936,052.06
+
+-- 1 of 2 --
+
+Posted Date 	Value Date 	Description 	Debit (NGN) 	Credit (NGN) 	Balance (NGN)
+01-MAR-25 	28-FEB-25 	TRF//FRM ADAEZE CHUKWU TO ADAEZE CHUKWU 	- 	50,000.00 	837,892.88
+18-JAN-25 	18-JAN-25 	TRF/18QueensDrive 4thQtr2024AcctgServices/TO
+ADAEZE CHUKWU FROM OL' MANS COVE
+VENTURES
+- 	150,000.00 	986,128.94
+
+-- 2 of 2 --
+
+This is an automated transaction alert service. For enquiries on Access Bank's products and services, please call the Access Bank Contact Centre.
