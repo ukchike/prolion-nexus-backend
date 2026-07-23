@@ -12,7 +12,7 @@ Deployed on Railway. Never touches Supabase — file/transactions in, structured
 ## Parser calibration status
 | Parser | Status |
 |---|---|
-| Access (specific) | CALIBRATED — verified against real e-statement (117 txns in production) |
+| Access (specific) | CALIBRATED against TWO distinct real Access Bank export layouts — a branch-issued multi-line "block" statement (117 txns in production) and a tab-separated internet-banking self-service export (292/297 real txns, deposits total reconciled exactly to the statement footer). `parseAccessText` tries the block format first, falls back to the tab format automatically |
 | Zenith (specific) | CALIBRATED — verified, totals match statement footer exactly |
 | Generic multi-layout ('auto') | Covers the 4 common Nigerian internet/mobile-banking layout families. Verified against a 36-bank SPECIMEN pack — every statement reconciled to its own printed Total Credit / Total Debit / Closing Balance (543 txns, 0 failures). Specimens are synthetic; spot-check each genuinely new bank's REAL export before relying on it |
 | GTB (specific) | Assumed layout, no real statement yet — falls back to 'auto' automatically if it finds nothing |
