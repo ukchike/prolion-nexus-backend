@@ -10,7 +10,7 @@ const { getProvider } = require('./lib/aiProvider')
 const app = express()
 const PORT = process.env.PORT || 4000
 
-// Railway (and most PaaS hosts) sit the app behind a reverse proxy —
+// Render (and most PaaS hosts) sit the app behind a reverse proxy —
 // without this, req.ip resolves to the proxy's own address, and every
 // caller would share one rate-limit bucket. Trusting exactly one hop
 // (the platform's own edge, not arbitrary client-supplied headers) is

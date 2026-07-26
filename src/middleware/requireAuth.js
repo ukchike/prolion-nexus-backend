@@ -26,7 +26,7 @@ function getClient() {
     const key = process.env.SUPABASE_ANON_KEY
     if (!url || !key) {
       throw new Error(
-        'SUPABASE_URL (or SUPABASE_PROJECT_ID) and SUPABASE_ANON_KEY must be set to verify requests. Add them to Railway environment variables (or .env locally).'
+        'SUPABASE_URL (or SUPABASE_PROJECT_ID) and SUPABASE_ANON_KEY must be set to verify requests. Add them to the Render service’s environment variables (or .env locally).'
       )
     }
     supabase = createClient(url, key)

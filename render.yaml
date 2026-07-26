@@ -1,0 +1,53 @@
+# Render blueprint for the NEXUS backend (migrated from Railway).
+#
+# The app needed no code changes to run here: it already binds process.env.PORT
+# (Render injects one, as Railway did), already sets `trust proxy` to exactly
+# one hop for the platform edge, and already exposes /health for a health
+# check. What follows is only the deployment description.
+#
+# To deploy: Render Dashboard > New > Blueprint, point it at this repo, and it
+# reads this file. Variables marked `sync: false` are NOT stored here — Render
+# prompts for them once and keeps them encrypted. Never commit real keys.
+services:
+  - type: web
+    name: nexus-backend
+    runtime: node
+    plan: free
+    region: frankfurt # closest Render region to the Supabase project (eu-west-1)
+    branch: main
+    buildCommand: npm ci
+    startCommand: npm start
+
+    # Render restarts the service if this stops returning 2xx. The route is
+    # deliberately unauthenticated and does no Supabase or AI calls, so a
+    # provider outage cannot make the platform think the app is unhealthy.
+    healthCheckPath: /health
+
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # PORT is injected by Render — do NOT set it here. Setting it would
+      # override the port Render actually routes traffic to and the service
+      # would fail its health check while looking fine in the logs.
+      - key: NODE_VERSION
+        value: 22
+
+      # The deployed frontend origin. CORS rejects everything else, so this
+      # must match the real Vercel URL exactly (no trailing slash).
+      - key: FRONTEND_URL
+        sync: false
+
+      # 'anthropic' (default) or 'groq'.
+      - key: AI_PROVIDER
+        value: anthropic
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+
+      # Used only to verify the caller's session JWT — this service never
+      # queries the database. See src/middleware/requireAuth.js.
+      - key: SUPABASE_PROJECT_ID
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
