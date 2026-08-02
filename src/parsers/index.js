@@ -3,22 +3,26 @@ const { parseCSVBuffer, parseExcelBuffer } = require('./csvExcelParser')
 const { parseGTBText } = require('./gtb')
 const { parseAccessText } = require('./access')
 const { parseZenithText } = require('./zenith')
+const { parseFirstBankText } = require('./firstbank')
+const { parseProvidusText } = require('./providus')
 const { parseGenericText } = require('./generic')
 
 /**
  * 'auto' = the generic multi-layout parser (four Nigerian layout
  * families, verified against a 36-bank specimen pack). Bank-specific
  * parsers exist where a REAL export's layout was calibrated and it
- * differs from the generic families (Access and Zenith genuine
- * e-statements are multi-line block formats the generic engine does
- * not attempt).
+ * differs from the generic families (Access, Zenith, First Bank, and
+ * Providus genuine e-statements are multi-line block formats the
+ * generic engine does not attempt).
  */
-const SUPPORTED_BANKS = ['auto', 'access', 'zenith', 'gtb']
+const SUPPORTED_BANKS = ['auto', 'access', 'zenith', 'gtb', 'firstbank', 'providus']
 
 const PDF_TEXT_PARSERS = {
   gtb: parseGTBText,
   access: parseAccessText,
   zenith: parseZenithText,
+  firstbank: parseFirstBankText,
+  providus: parseProvidusText,
   auto: parseGenericText,
 }
 

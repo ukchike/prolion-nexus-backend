@@ -3,6 +3,8 @@ const path = require('path')
 const { parseCSVBuffer } = require('../src/parsers/csvExcelParser')
 const { parseAccessText } = require('../src/parsers/access')
 const { parseZenithText } = require('../src/parsers/zenith')
+const { parseFirstBankText } = require('../src/parsers/firstbank')
+const { parseProvidusText } = require('../src/parsers/providus')
 const { parseGenericText } = require('../src/parsers/generic')
 
 let failures = 0
@@ -65,6 +67,43 @@ function testZenithReal() {
   check('the one credit transaction was correctly identified (not as a debit)', transactions.filter((t) => t.credit).length === 1)
 }
 
+function testFirstBankReal() {
+  console.log('\n--- First Bank (REAL statement sample, 5 pages) ---')
+  const text = fs.readFileSync(path.join(__dirname, 'fixtures/firstbank-real-sample.txt'), 'utf-8')
+  const { transactions, unparsedLines } = parseFirstBankText(text)
+  check('120 transactions parsed from the real sample', transactions.length === 120)
+  check('no unparsed blocks', unparsedLines.length === 0)
+  const totalDebits = transactions.reduce((s, t) => s + (t.debit || 0), 0)
+  const totalCredits = transactions.reduce((s, t) => s + (t.credit || 0), 0)
+  check('total debits match the statement footer exactly (45,967,804.21)', Math.abs(totalDebits - 45967804.21) < 0.01)
+  check('total credits match the statement footer exactly (75,772,000.00)', Math.abs(totalCredits - 75772000) < 0.01)
+  check('closing balance matches footer (112,323,590.01)', Math.abs(transactions[transactions.length - 1].balance - 112323590.01) < 0.01)
+  check('opening/closing balance rows skipped (not transactions)', !transactions.some((t) => /opening balance|closing balance/i.test(t.description)))
+  check(
+    'a wrapped 2-line "Stamp Duty Charge" block parsed correctly (debit 100)',
+    !!transactions.find((t) => t.debit === 100 && /Stamp Duty Charge/i.test(t.description))
+  )
+}
+
+function testProvidusReal() {
+  console.log('\n--- Providus Bank (REAL statement sample, 24 pages) ---')
+  const text = fs.readFileSync(path.join(__dirname, 'fixtures/providus-real-sample.txt'), 'utf-8')
+  const { transactions, unparsedLines } = parseProvidusText(text)
+  check('519 transactions parsed from the real sample', transactions.length === 519)
+  check('no unparsed blocks', unparsedLines.length === 0)
+  check('274 debit / 245 credit, matching the statement footer DEB./CRED. COUNT exactly', transactions.filter((t) => t.debit != null).length === 274 && transactions.filter((t) => t.credit != null).length === 245)
+  const totalCredits = transactions.reduce((s, t) => s + (t.credit || 0), 0)
+  check('total credits match the statement footer exactly (22,151,852.00)', Math.abs(totalCredits - 22151852) < 0.01)
+  check('closing balance matches footer (14,246,895.90)', Math.abs(transactions[transactions.length - 1].balance - 14246895.9) < 0.01)
+  let runningBalance = 7808662.13
+  const balanceChainBroken = transactions.some((t) => {
+    const expected = runningBalance + (t.credit || 0) - (t.debit || 0)
+    runningBalance = t.balance
+    return Math.abs(expected - t.balance) > 0.01
+  })
+  check('every transaction reconstructs the running balance chain from OPENING BAL. with zero drift', !balanceChainBroken)
+}
+
 function testGenericParser() {
   console.log('\n--- Generic multi-layout parser (4 families + edge cases) ---')
 
@@ -96,6 +135,8 @@ testCSV()
 testAccessReal()
 testAccessTabFormat()
 testZenithReal()
+testFirstBankReal()
+testProvidusReal()
 testGenericParser()
 
 console.log('\n=================================')
