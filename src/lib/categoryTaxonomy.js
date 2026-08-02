@@ -1,13 +1,19 @@
 /**
- * Category taxonomy for NEXUS — 46 categories total.
+ * Category taxonomy for NEXUS — 49 categories total (grown from an
+ * original 46-category pass as later features needed their own control
+ * accounts — Trade Receivable Recognized, Employer Pension Contribution,
+ * Net Salaries/PAYE/Pension Payable, and now VAT Payable Settled).
  * Aligned to a real FIRS CIT computation template, then consolidated
  * per user instruction: Operating Expenses capped at 20 (from an
- * initial 51-category full-granularity pass), Balance Sheet capped at
- * 16 (from 19, merging three paired movements — direction remains
- * recoverable from debit/credit). CIT-sensitive categories (Fines &
- * Penalties, Donations, CSR, Entertainment) kept distinct regardless of
- * caps since they're not fully tax-deductible. Other Income remains a
- * single catch-all per explicit user decision.
+ * initial 51-category full-granularity pass), Balance Sheet originally
+ * capped at 16 (from 19, merging three paired movements — direction
+ * remains recoverable from debit/credit), since grown to 18 for the
+ * additions above. 'VAT Payable Settled' exists so a VAT remittance to
+ * FIRS has somewhere to post that isn't the "Tax Payments" P&L expense
+ * (see the account note on that category, below). CIT-sensitive
+ * categories (Fines & Penalties, Donations, CSR, Entertainment) kept
+ * distinct regardless of caps since they're not fully tax-deductible.
+ * Other Income remains a single catch-all per explicit user decision.
  */
 
 const CATEGORY_GROUPS = {
@@ -119,6 +125,15 @@ const BALANCE_SHEET_CATEGORY_DEFINITIONS = [
   { name: 'Loan Repayment - Principal (Current)', subgroup: BALANCE_SHEET_SUBGROUPS.CURRENT_LIABILITIES },
   { name: 'Intercompany Payable', subgroup: BALANCE_SHEET_SUBGROUPS.CURRENT_LIABILITIES },
   { name: 'Trade Payables Settled', subgroup: BALANCE_SHEET_SUBGROUPS.CURRENT_LIABILITIES },
+  // VAT collected on sales and VAT paid on purchases already post to their
+  // own control accounts (2030 output / 1180 input) automatically on every
+  // VAT-inclusive transaction — see ledger/bridge.js. This category is only
+  // for the actual remittance: the cash payment of the net VAT difference to
+  // FIRS/NRS, which settles the 2030 liability directly. It must stay out of
+  // "Tax Payments" (a P&L expense) — VAT is a pass-through, not a cost, and
+  // routing a remittance through 7500 would double-count it against the P&L
+  // while leaving the 2030 control account balance never cleared down.
+  { name: 'VAT Payable Settled', subgroup: BALANCE_SHEET_SUBGROUPS.CURRENT_LIABILITIES },
 
   { name: 'Loan Received - Non-current', subgroup: BALANCE_SHEET_SUBGROUPS.NON_CURRENT_LIABILITIES },
   { name: 'Loan Repayment - Principal (Non-current)', subgroup: BALANCE_SHEET_SUBGROUPS.NON_CURRENT_LIABILITIES },
@@ -223,6 +238,7 @@ const CATEGORY_METADATA = {
   'Loan Repayment - Principal (Current)': { deductible: null, vatTreatment: 'not_applicable' },
   'Intercompany Payable': { deductible: null, vatTreatment: 'not_applicable' },
   'Trade Payables Settled': { deductible: null, vatTreatment: 'not_applicable' },
+  'VAT Payable Settled': { deductible: null, vatTreatment: 'not_applicable' },
   'Loan Received - Non-current': { deductible: null, vatTreatment: 'not_applicable' },
   'Loan Repayment - Principal (Non-current)': { deductible: null, vatTreatment: 'not_applicable' },
 

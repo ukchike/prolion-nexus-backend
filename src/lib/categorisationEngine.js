@@ -62,7 +62,7 @@ Guidance:
 - Use "Uncategorised" only when genuinely ambiguous — prefer a real category whenever the description gives any usable signal
 - Bank-related fees (SMS alerts, account maintenance, COT) are "Bank Charges", not generic expenses
 - Recognisable salary/payroll language is "Staff Salaries & Wages"
-- Recognisable tax authority references (FIRS, NRS, VAT, WHT, PAYE remittance) are "Tax Payments"
+- Recognisable tax authority references (FIRS, NRS, WHT, PAYE remittance, CIT) are "Tax Payments" — EXCEPT a VAT payment/remittance specifically, which is "VAT Payable Settled" (Balance Sheet): VAT already posts to its own control account on every VAT-inclusive sale/purchase, so the remittance settles that account rather than being a new expense
 - IMPORTANT accounting distinction — do not treat loan or drawing movements as income/expense:
   - Money coming in described as a loan, facility drawdown, or overdraft drawdown is "Loan Received - Current" or "Loan Received - Non-current" (Balance Sheet), never "Sales Revenue" or "Other Income"
   - Money going out to repay a loan's principal is "Loan Repayment - Principal (Current)" or "Loan Repayment - Principal (Non-current)" (Balance Sheet); only an explicitly-labelled interest portion is "Interest Expense" (P&L)
