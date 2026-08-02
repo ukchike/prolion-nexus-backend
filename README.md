@@ -1,7 +1,7 @@
 # NEXUS Backend
 
 Stateless parsing + AI categorisation service for NEXUS by Prolion.
-Deployed on Railway. Never touches Supabase — file/transactions in, structured data out.
+Deployed on Render. Never touches Supabase — file/transactions in, structured data out.
 
 ## Endpoints
 - `GET /health` — liveness + a `config` block reporting whether Supabase/AI-provider env vars are actually set
@@ -40,14 +40,41 @@ Provider is selected by `AI_PROVIDER` env var: `anthropic` (default,
 Claude Haiku) or `groq` (free, Llama 3.3 70B). Same endpoint, same
 response shape.
 
-## Environment (.env locally, Railway variables when deployed)
+## Environment (.env locally, Render service variables when deployed)
 ```
-PORT=4000
-FRONTEND_URL=<vercel url>
-AI_PROVIDER=groq
+PORT=4000                      # local only — Render injects its own, do not set it there
+FRONTEND_URL=<vercel url>      # exact origin, no trailing slash; CORS rejects anything else
+AI_PROVIDER=anthropic          # or 'groq'
 GROQ_API_KEY=<from console.groq.com>
-ANTHROPIC_API_KEY=<optional, once funded>
+ANTHROPIC_API_KEY=<from console.anthropic.com>
+SUPABASE_PROJECT_ID=<project ref>
+SUPABASE_ANON_KEY=<anon key>   # verifies the caller's JWT only; no DB access
 ```
+
+## Deploying to Render
+
+`render.yaml` in the repo root is a Render blueprint: **New > Blueprint**, point
+it at this repo and it provisions the service. Secrets are marked `sync: false`,
+so Render prompts for them once and stores them encrypted rather than keeping
+them in git.
+
+No application code was needed for the move off Railway — the app already binds
+`process.env.PORT`, already sets `trust proxy` to one hop for the platform edge,
+and already exposes `/health` for the platform health check.
+
+Two things to get right when cutting over:
+
+1. **Set `FRONTEND_URL` to the real Vercel origin.** CORS allow-listing is
+   driven by it, so a wrong or trailing-slashed value makes every browser call
+   fail with an opaque CORS error while `curl` keeps working.
+2. **Repoint the frontend at the new host.** The Render URL differs from the
+   Railway one, so `VITE_API_BASE_URL` in the Vercel project has to be updated
+   and the frontend redeployed, or the app keeps calling a dead Railway host.
+
+On Render's free plan the service sleeps when idle and the next request pays a
+cold start of roughly 30–60 seconds. Statement parsing and AI categorisation
+are already slow, user-initiated actions, so this is survivable — but it is a
+real change in behaviour from Railway, not a detail.
 
 ## Testing
 - `node test/parser.test.js` — parsers vs real fixtures (no network)

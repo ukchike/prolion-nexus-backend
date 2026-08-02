@@ -17,7 +17,7 @@ router.post('/categorise-transactions', requireAuth, categoriseLimiter, async (r
 
     if (!process.env[provider.requiredEnvVar]) {
       return res.status(500).json({
-        error: `${provider.requiredEnvVar} is not configured on this server (AI_PROVIDER="${provider.name}"). Add it to Railway environment variables (or .env locally) before using categorisation.`,
+        error: `${provider.requiredEnvVar} is not configured on this server (AI_PROVIDER="${provider.name}"). Add it to the Render service’s environment variables (or .env locally) before using categorisation.`,
       })
     }
 

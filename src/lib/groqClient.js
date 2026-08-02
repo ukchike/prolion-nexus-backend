@@ -37,7 +37,7 @@ async function callGroq(prompt, options = {}) {
 async function attemptGroq(prompt, options, attempt) {
   if (!process.env.GROQ_API_KEY) {
     throw new Error(
-      'GROQ_API_KEY is not set. Get a free key from console.groq.com and add it to your .env (locally) or Railway environment variables (deployed).'
+      'GROQ_API_KEY is not set. Get a free key from console.groq.com and add it to your .env (locally) or the Render service’s environment variables (deployed).'
     )
   }
 

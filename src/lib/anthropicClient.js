@@ -6,7 +6,7 @@ function getClient() {
   if (!client) {
     if (!process.env.ANTHROPIC_API_KEY) {
       throw new Error(
-        'ANTHROPIC_API_KEY is not set. Get one from console.anthropic.com and add it to your .env (locally) or Railway environment variables (deployed).'
+        'ANTHROPIC_API_KEY is not set. Get one from console.anthropic.com and add it to your .env (locally) or the Render service’s environment variables (deployed).'
       )
     }
     client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })

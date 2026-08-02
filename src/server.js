@@ -4,13 +4,14 @@ const cors = require('cors')
 const statementsRouter = require('./routes/statements')
 const categoriseRouter = require('./routes/categorise')
 const assistantRouter = require('./routes/assistant')
+const teamRouter = require('./routes/team')
 const { generalLimiter } = require('./middleware/rateLimiters')
 const { getProvider } = require('./lib/aiProvider')
 
 const app = express()
 const PORT = process.env.PORT || 4000
 
-// Railway (and most PaaS hosts) sit the app behind a reverse proxy —
+// Render (and most PaaS hosts) sit the app behind a reverse proxy —
 // without this, req.ip resolves to the proxy's own address, and every
 // caller would share one rate-limit bucket. Trusting exactly one hop
 // (the platform's own edge, not arbitrary client-supplied headers) is
@@ -86,6 +87,7 @@ app.use('/api', generalLimiter)
 app.use('/api', statementsRouter)
 app.use('/api', categoriseRouter)
 app.use('/api', assistantRouter)
+app.use('/api', teamRouter)
 
 app.use((req, res) => {
   res.status(404).json({ error: `No route for ${req.method} ${req.path}` })

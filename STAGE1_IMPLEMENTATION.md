@@ -313,29 +313,44 @@ Authorization: Bearer {TOKEN}
 
 ---
 
-## 🚀 Deployment to Railway
+## 🚀 Deployment to Render
 
-### 1. Set Environment Variables in Railway
+### 1. Provision from the blueprint
+`render.yaml` in the repo root describes the service. In Render: **New >
+Blueprint**, point it at this repo. Secrets are declared `sync: false`, so
+Render prompts for them rather than reading them from git.
+
+### 2. Set the service environment variables
 ```
-PORT=4000
-FRONTEND_URL=https://your-nexus.vercel.app
-AI_PROVIDER=groq
+FRONTEND_URL=https://your-nexus.vercel.app   # exact origin, no trailing slash
+AI_PROVIDER=anthropic                        # or 'groq'
+ANTHROPIC_API_KEY=sk-ant-...
 GROQ_API_KEY=gsk_...
-SUPABASE_PROJECT_ID=wcwvztcdvoepgnkukesg
-SUPABASE_ANON_KEY=eyJhbGc... (from Supabase dashboard)
-SUPABASE_SERVICE_KEY=eyJhbGc...
+SUPABASE_PROJECT_ID=<project ref>
+SUPABASE_ANON_KEY=eyJhbGc...                 # verifies caller JWTs; no DB access
 ```
+Do NOT set `PORT` — Render injects it, and overriding it makes the service
+fail its health check.
 
-### 2. Deploy
+`SUPABASE_SERVICE_KEY` is deliberately absent: this service never queries the
+database, so it has no use for a key that would bypass RLS if leaked.
+
+### 3. Deploy
 ```bash
 git push origin claude/nexu-assessment-roadmap-jnf7v1
-# Railway auto-deploys via webhook
+# Render auto-deploys from the connected branch
 ```
 
-### 3. Verify Deployment
+### 4. Verify
 ```bash
-curl https://your-railway-url/health
+curl https://<your-service>.onrender.com/health
 ```
+The `config` block in the response reports whether each env var is actually
+set, so a missing key shows up here rather than as a confusing 500 later.
+
+### 5. Repoint the frontend
+Update `VITE_API_BASE_URL` in the Vercel project to the new Render URL and
+redeploy. Until that is done the app still calls the dead Railway host.
 
 ---
 
