@@ -12,6 +12,7 @@
 const express = require('express')
 const { requireAuth } = require('../middleware/requireAuth')
 const { getAdminClient } = require('../lib/supabaseAdmin')
+const { seatLimitForTier } = require('../lib/seatLimits')
 
 const router = express.Router()
 
@@ -83,6 +84,32 @@ router.post('/team/invite', requireAuth, async (req, res) => {
     }
     if (membership.role !== 'owner') {
       return res.status(403).json({ error: 'Only the company owner can invite teammates.' })
+    }
+
+    // Seat cap, checked BEFORE inviteUserByEmail so a company over its
+    // limit never gets an email sent that it can't honour. Pending invites
+    // count against the cap — they've effectively claimed their seat, and
+    // ignoring them would let several invites go out at once and overshoot
+    // the limit as they're accepted.
+    const { data: company, error: companyError } = await supabaseAdmin
+      .from('company_profiles')
+      .select('complexity_level')
+      .eq('id', membership.company_id)
+      .maybeSingle()
+    if (companyError) throw companyError
+
+    const seatLimit = seatLimitForTier(company?.complexity_level)
+    if (seatLimit !== null) {
+      const { count, error: countError } = await supabaseAdmin
+        .from('company_members')
+        .select('id', { count: 'exact', head: true })
+        .eq('company_id', membership.company_id)
+      if (countError) throw countError
+      if ((count || 0) >= seatLimit) {
+        return res.status(403).json({
+          error: `Your plan includes ${seatLimit} team member${seatLimit === 1 ? '' : 's'}. Upgrade your plan in Settings to invite more.`,
+        })
+      }
     }
 
     const { data: existingInvite } = await supabaseAdmin

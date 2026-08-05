@@ -1,16 +1,17 @@
 /**
- * Category taxonomy for NEXUS — 49 categories total (grown from an
+ * Category taxonomy for NEXUS — 50 categories total (grown from an
  * original 46-category pass as later features needed their own control
  * accounts — Trade Receivable Recognized, Employer Pension Contribution,
- * Net Salaries/PAYE/Pension Payable, and now VAT Payable Settled).
+ * Net Salaries/PAYE/Pension Payable, VAT Payable Settled, and now Trade
+ * Payable Recognized for the Purchases module).
  * Aligned to a real FIRS CIT computation template, then consolidated
  * per user instruction: Operating Expenses capped at 20 (from an
  * initial 51-category full-granularity pass), Balance Sheet originally
  * capped at 16 (from 19, merging three paired movements — direction
- * remains recoverable from debit/credit), since grown to 18 for the
- * additions above. 'VAT Payable Settled' exists so a VAT remittance to
- * FIRS has somewhere to post that isn't the "Tax Payments" P&L expense
- * (see the account note on that category, below). CIT-sensitive
+ * remains recoverable from debit/credit), since grown to 19 for the
+ * additions above. 'Trade Payable Recognized' pairs with 'Trade Payables
+ * Settled' the same way 'Trade Receivable Recognized' pairs with 'Trade
+ * Receivables Collected' — see purchasesLedger.js. CIT-sensitive
  * categories (Fines & Penalties, Donations, CSR, Entertainment) kept
  * distinct regardless of caps since they're not fully tax-deductible.
  * Other Income remains a single catch-all per explicit user decision.
@@ -124,6 +125,12 @@ const BALANCE_SHEET_CATEGORY_DEFINITIONS = [
   { name: 'Loan Received - Current', subgroup: BALANCE_SHEET_SUBGROUPS.CURRENT_LIABILITIES },
   { name: 'Loan Repayment - Principal (Current)', subgroup: BALANCE_SHEET_SUBGROUPS.CURRENT_LIABILITIES },
   { name: 'Intercompany Payable', subgroup: BALANCE_SHEET_SUBGROUPS.CURRENT_LIABILITIES },
+  // Paired with 'Trade Payables Settled' below, same convention as
+  // 'Trade Receivable Recognized'/'Trade Receivables Collected' — Recognized
+  // is the credit leg booked when an accrual-basis Bill is approved (money
+  // owed to the supplier increases); Settled is the debit leg booked when
+  // that money is actually paid. See purchasesLedger.js.
+  { name: 'Trade Payable Recognized', subgroup: BALANCE_SHEET_SUBGROUPS.CURRENT_LIABILITIES },
   { name: 'Trade Payables Settled', subgroup: BALANCE_SHEET_SUBGROUPS.CURRENT_LIABILITIES },
   // VAT collected on sales and VAT paid on purchases already post to their
   // own control accounts (2030 output / 1180 input) automatically on every
@@ -237,6 +244,7 @@ const CATEGORY_METADATA = {
   'Loan Received - Current': { deductible: null, vatTreatment: 'not_applicable' },
   'Loan Repayment - Principal (Current)': { deductible: null, vatTreatment: 'not_applicable' },
   'Intercompany Payable': { deductible: null, vatTreatment: 'not_applicable' },
+  'Trade Payable Recognized': { deductible: null, vatTreatment: 'not_applicable' },
   'Trade Payables Settled': { deductible: null, vatTreatment: 'not_applicable' },
   'VAT Payable Settled': { deductible: null, vatTreatment: 'not_applicable' },
   'Loan Received - Non-current': { deductible: null, vatTreatment: 'not_applicable' },
