@@ -96,11 +96,11 @@ function testValidation() {
 }
 
 function testTaxonomyStructure() {
-  console.log('\n--- Taxonomy structure (49 categories, capped groups, FX + director treatment) ---')
+  console.log('\n--- Taxonomy structure (50 categories, capped groups, FX + director treatment) ---')
   const t = require('../src/lib/categoryTaxonomy')
-  check('total is exactly 49', t.ALL_CATEGORIES.length === 49)
-  check('no duplicates', new Set(t.ALL_CATEGORIES).size === 49)
-  check('Balance Sheet capped at 18 (VAT Payable Settled added for VAT remittance postings)', t.BALANCE_SHEET_CATEGORIES.length <= 18)
+  check('total is exactly 50', t.ALL_CATEGORIES.length === 50)
+  check('no duplicates', new Set(t.ALL_CATEGORIES).size === 50)
+  check('Balance Sheet capped at 19 (Trade Payable Recognized added for the Purchases module)', t.BALANCE_SHEET_CATEGORIES.length <= 19)
   check('exactly 4 Cost of Sales categories',
     t.EXPENSE_CATEGORY_DEFINITIONS.filter((d) => d.subgroup === 'COST_OF_SALES').length === 4)
   check('Operating capped at 20 (now 19 after FX Loss moved out)',
