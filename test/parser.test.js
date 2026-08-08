@@ -5,6 +5,7 @@ const { parseAccessText } = require('../src/parsers/access')
 const { parseZenithText } = require('../src/parsers/zenith')
 const { parseFirstBankText } = require('../src/parsers/firstbank')
 const { parseProvidusText } = require('../src/parsers/providus')
+const { parseMoniepointText, parseSummary } = require('../src/parsers/moniepoint')
 const { parseGenericText } = require('../src/parsers/generic')
 
 let failures = 0
@@ -131,12 +132,70 @@ function testGenericParser() {
   check('header/totals rows produce zero transactions and zero unparsed noise', headerNoise.transactions.length === 0 && headerNoise.unparsedLines.length === 0)
 }
 
+function testMoniepointLayout() {
+  console.log('\n--- Moniepoint (layout fixture, anonymised) ---')
+  // The fixture reproduces the real statement's LAYOUT exactly — including
+  // every trap below — with invented names and account numbers, because the
+  // calibration statement is a third party's and its counterparties are named
+  // individuals. Reconciliation against the real 97-page export lives in
+  // scripts/calibrate-moniepoint.js.
+  const text = fs.readFileSync(path.join(__dirname, 'fixtures/moniepoint-layout-sample.txt'), 'utf-8')
+  const { transactions, unparsedLines } = parseMoniepointText(text)
+  const summary = parseSummary(text)
+
+  check('5 transactions parsed', transactions.length === 5)
+  check('no unparsed lines', unparsedLines.length === 0)
+
+  // The summary box's labels wrap across lines ("Opening" / "Balance 1,000.00").
+  check('summary opening balance read', summary.openingBalance === 1000)
+  check('summary total debits read', summary.totalDebits === 10071.5)
+  check('summary total credits read', summary.totalCredits === 50050)
+  check('summary closing balance read', summary.closingBalance === 40978.5)
+
+  // Trap 1: the timestamp is split across two lines, and the split point
+  // varies. Neither form may leak digits into the description.
+  const vat = transactions.find((t) => t.description === 'Value Added Tax')
+  check('HH: + MM split leaves a clean description', !!vat && vat.debit === 1.5)
+  const stamp = transactions.find((t) => t.description === 'Stamp duty')
+  check('HH: + MM:SS split leaves a clean description', !!stamp && stamp.debit === 50)
+
+  // Trap 2: a reversal's reference says _DEBIT_ while the money is a CREDIT.
+  // Reading the suffix instead of the columns books it backwards.
+  const reversal = transactions.find((t) => /reversal/.test(t.description))
+  check('reversal is booked as a CREDIT, not a debit', !!reversal && reversal.credit === 50 && reversal.debit === null)
+  check('reversal keeps a readable note', !!reversal && reversal.description === 'Stamp duty (reversal)')
+
+  // Multi-line narration, and a page marker landing between two rows.
+  const transfer = transactions.find((t) => t.debit === 10020)
+  check('multi-line narration is joined', !!transfer && /TRANSFER TO EXAMPLE COUNTERPARTY NAME/.test(transfer.description))
+  check('page markers are not treated as narration', !transactions.some((t) => /\d+ of \d+/.test(t.description)))
+
+  // The machine reference is stripped from what the user reads.
+  check('reference is not left in the description', !transactions.some((t) => /_DEBIT_|_CREDIT_/.test(t.description)))
+
+  check('dates are ISO', transactions.every((t) => /^\d{4}-\d{2}-\d{2}$/.test(t.transaction_date)))
+
+  // The fixture ticks back to its own summary box, same discipline as the
+  // real-statement calibration.
+  const debitTotal = Math.round(transactions.reduce((s2, t) => s2 + (t.debit || 0), 0) * 100) / 100
+  const creditTotal = Math.round(transactions.reduce((s2, t) => s2 + (t.credit || 0), 0) * 100) / 100
+  check('parsed debits agree with the summary box', debitTotal === summary.totalDebits)
+  check('parsed credits agree with the summary box', creditTotal === summary.totalCredits)
+  check('opening + credits - debits = closing', Math.round((summary.openingBalance + creditTotal - debitTotal) * 100) / 100 === summary.closingBalance)
+
+  // A Moniepoint export yields NOTHING under the generic engine, which is why
+  // it needs its own parser and why index.js falls back from 'auto' to the
+  // bank-specific parsers.
+  check('generic engine does not claim this layout', parseGenericText(text).transactions.length === 0)
+}
+
 testCSV()
 testAccessReal()
 testAccessTabFormat()
 testZenithReal()
 testFirstBankReal()
 testProvidusReal()
+testMoniepointLayout()
 testGenericParser()
 
 console.log('\n=================================')

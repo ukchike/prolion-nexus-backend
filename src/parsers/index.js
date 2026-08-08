@@ -5,17 +5,18 @@ const { parseAccessText } = require('./access')
 const { parseZenithText } = require('./zenith')
 const { parseFirstBankText } = require('./firstbank')
 const { parseProvidusText } = require('./providus')
+const { parseMoniepointText } = require('./moniepoint')
 const { parseGenericText } = require('./generic')
 
 /**
  * 'auto' = the generic multi-layout parser (four Nigerian layout
  * families, verified against a 36-bank specimen pack). Bank-specific
  * parsers exist where a REAL export's layout was calibrated and it
- * differs from the generic families (Access, Zenith, First Bank, and
- * Providus genuine e-statements are multi-line block formats the
- * generic engine does not attempt).
+ * differs from the generic families (Access, Zenith, First Bank,
+ * Providus and Moniepoint genuine e-statements are multi-line block
+ * formats the generic engine does not attempt).
  */
-const SUPPORTED_BANKS = ['auto', 'access', 'zenith', 'gtb', 'firstbank', 'providus']
+const SUPPORTED_BANKS = ['auto', 'access', 'zenith', 'gtb', 'firstbank', 'providus', 'moniepoint']
 
 const PDF_TEXT_PARSERS = {
   gtb: parseGTBText,
@@ -23,6 +24,7 @@ const PDF_TEXT_PARSERS = {
   zenith: parseZenithText,
   firstbank: parseFirstBankText,
   providus: parseProvidusText,
+  moniepoint: parseMoniepointText,
   auto: parseGenericText,
 }
 
@@ -60,6 +62,30 @@ async function parseStatement({ buffer, fileType, bankCode }) {
       if (genericResult.transactions.length > 0) {
         result = genericResult
         parserUsed = `${normalisedBank}->auto-fallback`
+      }
+    }
+
+    // The reverse fallback. 'auto' is what a user picks when they do not know
+    // (or do not see) their bank in the list, and the generic engine returns a
+    // flat ZERO on a genuine multi-line block export rather than a partial
+    // result — a real Moniepoint statement parses 0 rows under 'auto' and 1055
+    // under its own parser. Without this, choosing "Other Nigerian banks"
+    // silently produced an empty import and looked like a broken upload.
+    //
+    // Safe to try each in turn: every one of these parsers is anchored on its
+    // own bank's layout (its block-start regex has to match before anything is
+    // emitted), so a non-matching statement yields nothing rather than
+    // garbage. First non-empty result wins, and parserUsed names it so the
+    // frontend can still tell the user which layout was assumed.
+    if (normalisedBank === 'auto' && result.transactions.length === 0) {
+      for (const candidate of SUPPORTED_BANKS) {
+        if (candidate === 'auto') continue
+        const candidateResult = PDF_TEXT_PARSERS[candidate](rawText)
+        if (candidateResult.transactions.length > 0) {
+          result = candidateResult
+          parserUsed = `auto->${candidate}`
+          break
+        }
       }
     }
 
