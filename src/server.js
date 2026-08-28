@@ -5,8 +5,10 @@ const statementsRouter = require('./routes/statements')
 const categoriseRouter = require('./routes/categorise')
 const assistantRouter = require('./routes/assistant')
 const teamRouter = require('./routes/team')
+const invoicesRouter = require('./routes/invoices')
 const { generalLimiter } = require('./middleware/rateLimiters')
 const { getProvider } = require('./lib/aiProvider')
+const { isEmailConfigured } = require('./lib/emailProvider')
 
 const app = express()
 const PORT = process.env.PORT || 4000
@@ -79,6 +81,10 @@ app.get('/health', (req, res) => {
       supabase: supabaseConfigured,
       aiProvider: aiProviderName,
       aiProviderKey: aiProviderConfigured,
+      // Same reason the keys above are reported: without this a deploy
+      // missing RESEND_API_KEY looks healthy until someone tries to send
+      // an invoice and gets a 503.
+      email: isEmailConfigured(),
     },
   })
 })
@@ -88,6 +94,7 @@ app.use('/api', statementsRouter)
 app.use('/api', categoriseRouter)
 app.use('/api', assistantRouter)
 app.use('/api', teamRouter)
+app.use('/api', invoicesRouter)
 
 app.use((req, res) => {
   res.status(404).json({ error: `No route for ${req.method} ${req.path}` })
