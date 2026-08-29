@@ -1,5 +1,5 @@
 /**
- * Category taxonomy for NEXUS — 50 categories total (grown from an
+ * Category taxonomy for PRIXUM — 50 categories total (grown from an
  * original 46-category pass as later features needed their own control
  * accounts — Trade Receivable Recognized, Employer Pension Contribution,
  * Net Salaries/PAYE/Pension Payable, VAT Payable Settled, and now Trade

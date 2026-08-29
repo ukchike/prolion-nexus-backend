@@ -1,4 +1,4 @@
-# Render blueprint for the NEXUS backend (migrated from Railway).
+# Render blueprint for the PRIXUM backend (migrated from Railway).
 #
 # The app needed no code changes to run here: it already binds process.env.PORT
 # (Render injects one, as Railway did), already sets `trust proxy` to exactly

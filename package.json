@@ -1,7 +1,7 @@
 {
   "name": "nexus-backend",
   "version": "1.0.0",
-  "description": "Stateless bank-statement parsing and AI categorisation service for NEXUS by Prolion",
+  "description": "Stateless bank-statement parsing and AI categorisation service for PRIXUM by Prolion",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
