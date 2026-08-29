@@ -1,6 +1,6 @@
 @echo off
 echo ===================================================
-echo NEXUS BACKEND - Deployment Verification
+echo PRIXUM BACKEND - Deployment Verification
 echo ===================================================
 echo.
 echo [1] Checking for latest taxonomy marker (Foreign Exchange Gain)...

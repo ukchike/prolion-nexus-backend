@@ -1,7 +1,7 @@
 /**
  * Sending an invoice to the customer it bills.
  *
- * WHY THE PDF ARRIVES FROM THE CLIENT. NEXUS already renders a branded,
+ * WHY THE PDF ARRIVES FROM THE CLIENT. PRIXUM already renders a branded,
  * correct invoice PDF in the browser (components/sales/documentPdf.js) —
  * logo, bank details, WHT/VAT lines, signatory block. Re-rendering it here
  * would be a SECOND implementation of the same document, and the two
@@ -52,7 +52,7 @@ function buildHtml({ message, businessName, invoiceNumber }) {
     ${messageToHtml(message)}
     <p style="margin:22px 0 0;padding-top:16px;border-top:1px solid #dde4e3;font-size:12px;color:#5e7176">
       ${escapeHtml(invoiceNumber)} is attached as a PDF.<br>
-      Sent by ${escapeHtml(businessName)} via NEXUS.
+      Sent by ${escapeHtml(businessName)} via PRIXUM.
     </p>
   </div></body></html>`
 }

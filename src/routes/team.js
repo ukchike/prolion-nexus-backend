@@ -1,5 +1,5 @@
 /**
- * Team membership management for a NEXUS company — list/invite/remove.
+ * Team membership management for a PRIXUM company — list/invite/remove.
  * Every route resolves the caller's own company_members row first (via
  * the service-role client, since a normal anon-key client can't see
  * across a whole table the way this needs to for the authorization
@@ -127,7 +127,7 @@ router.post('/team/invite', requireAuth, async (req, res) => {
       return res.status(400).json({ error: inviteError.message || 'Failed to send invite.' })
     }
 
-    // An existing NEXUS user (owner of their own company, or already staff
+    // An existing PRIXUM user (owner of their own company, or already staff
     // elsewhere) accepting this invite later would collide with the "one
     // active company per user" constraint — reject now, with a clear
     // reason, rather than leaving a stray invited row that fails silently
@@ -139,7 +139,7 @@ router.post('/team/invite', requireAuth, async (req, res) => {
       .eq('status', 'active')
       .maybeSingle()
     if (alreadyActive && alreadyActive.company_id !== membership.company_id) {
-      return res.status(409).json({ error: 'That person already belongs to a different NEXUS company and can’t be invited here.' })
+      return res.status(409).json({ error: 'That person already belongs to a different PRIXUM company and can’t be invited here.' })
     }
 
     const { error: memberError } = await supabaseAdmin

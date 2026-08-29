@@ -1,5 +1,5 @@
 /**
- * Outbound email for NEXUS.
+ * Outbound email for PRIXUM.
  *
  * Uses Resend's REST API over plain fetch rather than an SDK: the whole
  * surface we need is one POST, and Node 18+ has fetch built in, so a

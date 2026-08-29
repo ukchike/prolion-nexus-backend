@@ -1,6 +1,6 @@
-# NEXUS Backend
+# PRIXUM Backend
 
-Stateless parsing + AI categorisation service for NEXUS by Prolion.
+Stateless parsing + AI categorisation service for PRIXUM by Prolion.
 Deployed on Render. Never touches Supabase — file/transactions in, structured data out.
 
 ## Endpoints

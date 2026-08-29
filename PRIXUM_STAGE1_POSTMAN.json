@@ -1,6 +1,6 @@
 {
   "info": {
-    "name": "NEXUS Stage 1 - Backend APIs",
+    "name": "PRIXUM Stage 1 - Backend APIs",
     "description": "Manual Transactions, VAT Toggle, Dashboard Aggregation, Opening Balances",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },

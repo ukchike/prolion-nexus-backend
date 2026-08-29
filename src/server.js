@@ -119,6 +119,6 @@ app.use((err, req, res, next) => {
 })
 
 app.listen(PORT, () => {
-  console.log(`NEXUS backend listening on http://localhost:${PORT}`)
+  console.log(`PRIXUM backend listening on http://localhost:${PORT}`)
   console.log(`Allowed CORS origins (raw): ${rawAllowedOrigins.join(', ') || '(none configured)'}`)
 })

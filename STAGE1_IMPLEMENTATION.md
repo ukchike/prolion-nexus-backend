@@ -59,7 +59,7 @@ WHERE table_name = 'opening_balances';
 - `VATToggleSchema` — Boolean validation
 - `OpeningBalancesSchema` — Assets, liabilities, equity
 - `DashboardQuerySchema` — Date range filtering
-- All schemas include 46-category NEXUS taxonomy validation
+- All schemas include 46-category PRIXUM taxonomy validation
 - **Tests:** 20+ validation scenarios ✅
 
 #### D. Supabase Client (`src/lib/supabaseClient.js`)
@@ -262,7 +262,7 @@ npm run test:validation   # Validation schemas only
 ## 📡 Testing Endpoints with Postman
 
 ### 1. Import Postman Collection
-- File: `NEXUS_STAGE1_POSTMAN.json` (provided)
+- File: `PRIXUM_STAGE1_POSTMAN.json` (provided)
 - Includes all 4 endpoints with example payloads
 
 ### 2. Set Environment Variables
