@@ -14,7 +14,31 @@ const { requireAuth } = require('../middleware/requireAuth')
 const { getAdminClient } = require('../lib/supabaseAdmin')
 const { seatLimitForTier } = require('../lib/seatLimits')
 
+const { generatePassword } = require('../lib/generatedPassword')
+
 const router = express.Router()
+
+/**
+ * Finds an auth user by email address.
+ *
+ * The Admin API has no get-by-email, so this pages the user list. Bounded
+ * deliberately: this only runs when createUser has already told us the
+ * address is taken, so the account exists and will be found — the cap is
+ * there so a very large project cannot turn one invite into an unbounded
+ * scan.
+ */
+async function findUserByEmail(supabaseAdmin, email) {
+  const PER_PAGE = 200
+  const MAX_PAGES = 25
+  for (let page = 1; page <= MAX_PAGES; page++) {
+    const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: PER_PAGE })
+    if (error || !data?.users?.length) return null
+    const hit = data.users.find((u) => (u.email || '').toLowerCase() === email)
+    if (hit) return hit
+    if (data.users.length < PER_PAGE) return null
+  }
+  return null
+}
 
 // What a member can be granted, and at what level. Mirrors
 // src/lib/permissions.js in the frontend and the keys the RLS policies in
@@ -98,11 +122,15 @@ router.get('/team', requireAuth, async (req, res) => {
 
 router.post('/team/invite', requireAuth, async (req, res) => {
   try {
-    const { email } = req.body
+    const { email, name } = req.body
     if (!email || typeof email !== 'string' || !EMAIL_RE.test(email)) {
       return res.status(400).json({ error: 'A valid email address is required.' })
     }
     const normalizedEmail = email.trim().toLowerCase()
+    const fullName = typeof name === 'string' ? name.trim().slice(0, 120) : ''
+    if (!fullName) {
+      return res.status(400).json({ error: "The teammate's name is required." })
+    }
 
     const supabaseAdmin = getAdminClient()
     const membership = await getOwnMembership(supabaseAdmin, req.user.id)
@@ -149,33 +177,55 @@ router.post('/team/invite', requireAuth, async (req, res) => {
       return res.status(409).json({ error: 'That email has already been invited to this company.' })
     }
 
-    const { data: invited, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(normalizedEmail)
-    if (inviteError) {
-      return res.status(400).json({ error: inviteError.message || 'Failed to send invite.' })
+    // The account is created here with a password the owner hands over,
+    // rather than emailed a magic link. Two reasons this suits the people
+    // using PRIXUM: an owner adding a bookkeeper who is sitting beside them
+    // does not have to wait on an inbox, and delivery failures — a typo, a
+    // spam folder, a work address that blocks unknown senders — stop being a
+    // silent dead end that only surfaces when the person says they never got
+    // anything.
+    //
+    // email_confirm: true because the owner has vouched for the address by
+    // typing it; there is no confirmation link to click, so leaving it
+    // unconfirmed would block the sign-in this password exists for.
+    const password = generatePassword()
+    const { data: created, error: createError } = await supabaseAdmin.auth.admin.createUser({
+      email: normalizedEmail,
+      password,
+      email_confirm: true,
+      user_metadata: {
+        full_name: fullName,
+        // Read by the app on first sign-in to force a password change. The
+        // owner has seen this password, so it is shared knowledge from the
+        // moment it is created and must not stay in use.
+        must_change_password: true,
+      },
+    })
+
+    let invitedUser = created?.user
+    if (createError) {
+      // Already registered: they have their own password already, so a new
+      // one is neither needed nor ours to set. Attach them to the company
+      // and say so, rather than resetting a password they are still using.
+      const existing = await findUserByEmail(supabaseAdmin, normalizedEmail)
+      if (!existing) {
+        return res.status(400).json({ error: createError.message || 'Failed to create the account.' })
+      }
+      invitedUser = existing
     }
 
-    // An existing PRIXUM user (owner of their own company, or already staff
-    // elsewhere) accepting this invite later would collide with the "one
-    // active company per user" constraint — reject now, with a clear
-    // reason, rather than leaving a stray invited row that fails silently
-    // when they try to accept it.
-    const { data: alreadyActive } = await supabaseAdmin
-      .from('company_members')
-      .select('company_id')
-      .eq('user_id', invited.user.id)
-      .eq('status', 'active')
-      .maybeSingle()
-    if (alreadyActive && alreadyActive.company_id !== membership.company_id) {
-      return res.status(409).json({ error: 'That person already belongs to a different PRIXUM company and can’t be invited here.' })
-    }
+    const isNewAccount = !createError
 
     const { error: memberError } = await supabaseAdmin
       .from('company_members')
       .insert({
         company_id: membership.company_id,
-        user_id: invited.user.id,
+        user_id: invitedUser.id,
         role: 'staff',
-        status: 'invited',
+        // Active immediately: there is no link to click, so there is nothing
+        // to wait for. They can sign in with the password the owner gives
+        // them and will be made to replace it.
+        status: 'active',
         invited_email: normalizedEmail,
         permissions: cleanPermissions(req.body?.permissions),
       })
@@ -186,7 +236,16 @@ router.post('/team/invite', requireAuth, async (req, res) => {
       throw memberError
     }
 
-    return res.status(201).json({ invitedEmail: normalizedEmail })
+    // The password is returned ONCE, and only to the owner who just created
+    // the account. It is never stored anywhere readable and cannot be shown
+    // again — a hash is all Supabase keeps. An existing account gets none,
+    // because theirs was not changed.
+    return res.status(201).json({
+      invitedEmail: normalizedEmail,
+      name: fullName,
+      password: isNewAccount ? password : null,
+      existingAccount: !isNewAccount,
+    })
   } catch (err) {
     console.error('Team invite error:', err)
     return res.status(500).json({ error: err.message || 'Failed to invite teammate.' })
