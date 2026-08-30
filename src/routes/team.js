@@ -16,6 +16,20 @@ const { seatLimitForTier } = require('../lib/seatLimits')
 
 const router = express.Router()
 
+// The set of areas a member can be granted. Mirrors src/lib/permissions.js
+// in the frontend and the keys the RLS policies in 045 check. Validated
+// here because the request body is client-supplied: an unknown key would
+// sit in the row forever meaning nothing, and a caller could otherwise
+// store arbitrary JSON on a security-bearing column.
+const AREA_KEYS = new Set([
+  'banking', 'sales', 'purchases', 'inventory', 'payroll', 'projects', 'reports', 'accountant',
+])
+
+function cleanPermissions(input) {
+  if (!Array.isArray(input)) return []
+  return [...new Set(input.filter((k) => typeof k === 'string' && AREA_KEYS.has(k)))]
+}
+
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 async function getOwnMembership(supabaseAdmin, userId) {
@@ -150,6 +164,7 @@ router.post('/team/invite', requireAuth, async (req, res) => {
         role: 'staff',
         status: 'invited',
         invited_email: normalizedEmail,
+        permissions: cleanPermissions(req.body?.permissions),
       })
     if (memberError) {
       if (memberError.code === '23505') {
