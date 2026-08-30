@@ -16,31 +16,44 @@ const { seatLimitForTier } = require('../lib/seatLimits')
 
 const router = express.Router()
 
-// The set of areas a member can be granted. Mirrors src/lib/permissions.js
-// in the frontend and the keys the RLS policies in 045 check. Validated
-// here because the request body is client-supplied: an unknown key would
-// sit in the row forever meaning nothing, and a caller could otherwise
-// store arbitrary JSON on a security-bearing column.
-const AREA_KEYS = new Set([
-  'banking', 'sales', 'purchases', 'inventory', 'payroll', 'projects', 'reports', 'accountant',
+// What a member can be granted, and at what level. Mirrors
+// src/lib/permissions.js in the frontend and the keys the RLS policies in
+// 046 read with `permissions->>key`.
+//
+// Validated here because the request body is client-supplied: this column
+// decides access, so an unknown key or a made-up level must never reach it.
+// Anything not recognised is dropped rather than rejected — an older client
+// sending a key this server has not heard of should still be able to invite
+// someone, with the keys it does understand.
+const RESOURCE_KEYS = new Set([
+  'banking.statements', 'banking.transactions',
+  'sales.customers', 'sales.quotes', 'sales.invoices', 'sales.payments',
+  'purchases.suppliers', 'purchases.orders', 'purchases.bills', 'purchases.payments',
+  'inventory.items', 'inventory.movements',
+  'payroll.employees', 'payroll.settings',
+  'projects.projects',
+  'settings.business', 'settings.ledgers', 'settings.activity', 'settings.currencies',
+  'settings.ai', 'settings.opening-balances', 'settings.plan',
+  'reports.pl', 'reports.bs', 'reports.cf', 'reports.tb', 'reports.analysis', 'reports.summary',
+  'reports.customer-statement', 'reports.aging', 'reports.budget', 'reports.vat-wht',
+  'reports.draft', 'reports.ifrs', 'reports.statutory-remittance', 'reports.payroll-summary',
+  'reports.project-profitability', 'reports.stock-valuation', 'reports.reorder-report',
+  'reports.client-profitability', 'reports.hmo-receivables-aging', 'reports.pharmacy-stock-valuation',
 ])
 
+const LEVELS = new Set(['view', 'edit'])
+
+// Reports are read, never written, so an "edit" grant on one is meaningless
+// and is stored as view rather than silently kept as something the app would
+// then have to keep re-interpreting.
 function cleanPermissions(input) {
-  if (!Array.isArray(input)) return []
-  return [...new Set(input.filter((k) => typeof k === 'string' && AREA_KEYS.has(k)))]
-}
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-
-async function getOwnMembership(supabaseAdmin, userId) {
-  const { data, error } = await supabaseAdmin
-    .from('company_members')
-    .select('company_id, role')
-    .eq('user_id', userId)
-    .eq('status', 'active')
-    .maybeSingle()
-  if (error) throw error
-  return data
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return {}
+  const out = {}
+  for (const [key, level] of Object.entries(input)) {
+    if (!RESOURCE_KEYS.has(key) || !LEVELS.has(level)) continue
+    out[key] = key.startsWith('reports.') ? 'view' : level
+  }
+  return out
 }
 
 router.get('/team', requireAuth, async (req, res) => {
