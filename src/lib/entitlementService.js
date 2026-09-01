@@ -93,9 +93,11 @@ async function consumeAiCredits({ companyId, userId, feature, amount = 1, tokens
   if (error) throw error
   const result = Array.isArray(data) ? data[0] : data
 
+  // limit_value, not limit — LIMIT is a reserved word, so consume_usage's
+  // third OUT column is named limit_value (see the migration).
   if (!result.allowed) {
     throw new EntitlementError(
-      `Monthly AI credit allowance reached (${result.used} of ${result.limit} used). Upgrade your plan for more, or wait for next month's reset.`,
+      `Monthly AI credit allowance reached (${result.used} of ${result.limit_value} used). Upgrade your plan for more, or wait for next month's reset.`,
       { status: 402, upgradeMetric: 'ai_credits' }
     )
   }
