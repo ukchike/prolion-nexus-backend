@@ -3,6 +3,7 @@ const { categoriseTransactions, MAX_TRANSACTIONS_PER_REQUEST } = require('../lib
 const { getProvider } = require('../lib/aiProvider')
 const { requireAuth } = require('../middleware/requireAuth')
 const { categoriseLimiter } = require('../middleware/rateLimiters')
+const { assertCompanyMembership, consumeAiCredits, EntitlementError } = require('../lib/entitlementService')
 
 const router = express.Router()
 
@@ -21,7 +22,7 @@ router.post('/categorise-transactions', requireAuth, categoriseLimiter, async (r
       })
     }
 
-    const { transactions, bankName, extraRules } = req.body
+    const { transactions, bankName, extraRules, companyId } = req.body
 
     if (!Array.isArray(transactions) || transactions.length === 0) {
       return res.status(400).json({ error: 'Request body must include a non-empty "transactions" array.' })
@@ -59,9 +60,21 @@ router.post('/categorise-transactions', requireAuth, categoriseLimiter, async (r
       }
     }
 
+    // Optional for the same backward-compatibility reason as statements.js
+    // — but without it, this AI call runs uncounted against no company's
+    // allowance, so a real client always sends it. Checked only after
+    // every input-validation branch above, so a 400 never costs a credit.
+    if (typeof companyId === 'string') {
+      await assertCompanyMembership(req.user.id, companyId)
+      await consumeAiCredits({ companyId, userId: req.user.id, feature: 'categorisation', amount: 1 })
+    }
+
     const result = await categoriseTransactions(transactions, provider.call, { bankName, extraRules })
     return res.json({ ...result, provider: provider.name })
   } catch (err) {
+    if (err instanceof EntitlementError) {
+      return res.status(err.status).json({ error: err.message, upgradeMetric: err.upgradeMetric })
+    }
     console.error('Categorisation error:', err)
     return res.status(500).json({ error: err.message || 'Failed to categorise transactions.' })
   }

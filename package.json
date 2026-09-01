@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "test": "node test/parser.test.js && node test/categorise.test.js && node test/narrationCleaner.test.js && node test/requireAuth.test.js && node test/assistant.test.js && node test/fileSignature.test.js && node test/emailProvider.test.js",
+    "test": "node test/parser.test.js && node test/categorise.test.js && node test/narrationCleaner.test.js && node test/requireAuth.test.js && node test/assistant.test.js && node test/fileSignature.test.js && node test/emailProvider.test.js && node test/billing.test.js",
     "test:narration": "node test/narrationCleaner.test.js"
   },
   "license": "ISC",

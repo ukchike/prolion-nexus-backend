@@ -6,6 +6,7 @@ const categoriseRouter = require('./routes/categorise')
 const assistantRouter = require('./routes/assistant')
 const teamRouter = require('./routes/team')
 const invoicesRouter = require('./routes/invoices')
+const billingRouter = require('./routes/billing')
 const { generalLimiter } = require('./middleware/rateLimiters')
 const { getProvider } = require('./lib/aiProvider')
 const { isEmailConfigured } = require('./lib/emailProvider')
@@ -53,6 +54,13 @@ app.use(
     },
   })
 )
+// The webhook route needs the exact bytes Paystack signed, not a
+// re-serialised copy — express.json() below would parse-then-restring
+// them, which can hash differently (key order, whitespace). Scoping a
+// raw parser to just this one path, registered before the global json
+// parser, is what lets routes/billing.js verify the signature correctly
+// while every other route still gets a normal parsed req.body.
+app.use('/api/billing/webhook', express.raw({ type: 'application/json', limit: '1mb' }))
 app.use(express.json({ limit: '5mb' }))
 
 // Liveness always reports 'ok' (the process is up), but `config` surfaces
@@ -95,6 +103,7 @@ app.use('/api', categoriseRouter)
 app.use('/api', assistantRouter)
 app.use('/api', teamRouter)
 app.use('/api', invoicesRouter)
+app.use('/api', billingRouter)
 
 app.use((req, res) => {
   res.status(404).json({ error: `No route for ${req.method} ${req.path}` })
