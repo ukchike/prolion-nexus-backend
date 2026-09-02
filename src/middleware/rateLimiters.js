@@ -65,4 +65,19 @@ const assistantLimiter = rateLimit({
   message: { error: 'Too many assistant questions. Please wait a few minutes and try again.' },
 })
 
-module.exports = { generalLimiter, categoriseLimiter, parseLimiter, assistantLimiter }
+// Checkout creates a real Paystack transaction and a billing_transactions
+// row on every call — an external API cost and a persisted row, not just
+// a read. Left to only generalLimiter's 100/15min pre-auth backstop, a
+// single session could spam-create dozens of pending checkouts. Tighter
+// than parseLimiter for the same reason categoriseLimiter is tighter
+// than generalLimiter: this specific route is the expensive one.
+const billingWriteLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: byUserOrIp,
+  message: { error: 'Too many billing requests. Please wait a few minutes and try again.' },
+})
+
+module.exports = { generalLimiter, categoriseLimiter, parseLimiter, assistantLimiter, billingWriteLimiter }
