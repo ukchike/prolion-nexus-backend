@@ -32,12 +32,12 @@ test('exactly the five sold plans plus legacy are addressable', () => {
 
 test('prices match the spec exactly (ex-VAT, Naira)', () => {
   assertEqual(PLANS.free.priceMonthly, 0)
-  assertEqual(PLANS.starter.priceMonthly, 7500)
-  assertEqual(PLANS.starter.priceAnnual, 75000)
-  assertEqual(PLANS.growth.priceMonthly, 15000)
-  assertEqual(PLANS.growth.priceAnnual, 150000)
-  assertEqual(PLANS.business.priceMonthly, 30000)
-  assertEqual(PLANS.business.priceAnnual, 300000)
+  assertEqual(PLANS.starter.priceMonthly, 3500)
+  assertEqual(PLANS.starter.priceAnnual, 35000)
+  assertEqual(PLANS.growth.priceMonthly, 7500)
+  assertEqual(PLANS.growth.priceAnnual, 75000)
+  assertEqual(PLANS.business.priceMonthly, 20000)
+  assertEqual(PLANS.business.priceAnnual, 200000)
   assertEqual(PLANS.accountant.priceMonthly, 50000)
   assertEqual(PLANS.accountant.priceAnnual, 500000)
 })
@@ -50,8 +50,8 @@ test('annual pricing is exactly 10 months of the monthly price (two months free)
 
 test('limits step up plan over plan', () => {
   assertEqual(PLANS.free.limits.bank_statements, 1)
-  assertEqual(PLANS.starter.limits.bank_statements, 5)
-  assertEqual(PLANS.growth.limits.bank_statements, 20)
+  assertEqual(PLANS.starter.limits.bank_statements, 3)
+  assertEqual(PLANS.growth.limits.bank_statements, 6)
   assert(PLANS.business.limits.bank_statements === undefined, 'Business should be unlimited (key absent)')
   assertEqual(PLANS.free.limits.ai_credits, 20)
   assertEqual(PLANS.starter.limits.ai_credits, 150)
@@ -67,10 +67,21 @@ test('inventory/payroll/projects are Growth+ only, never Free or Starter', () =>
   assert(PLANS.business.features.inventory)
 })
 
-test('multi-company and consolidation are Business+ only', () => {
+test('multi-company and consolidation are Accountant-only', () => {
+  // Business is capped at 1 company (limits.companies), so it must NOT
+  // advertise multiCompany/consolidation -- that would be a feature flag
+  // the database can't honour. Only Accountant (companies: 20) does.
   assert(!PLANS.growth.features.multiCompany)
-  assert(PLANS.business.features.multiCompany)
+  assert(!PLANS.business.features.multiCompany)
   assert(PLANS.accountant.features.multiCompany)
+})
+
+test('a plan never advertises multiCompany while capped at 1 company', () => {
+  for (const key of PUBLIC_PLAN_ORDER) {
+    if (PLANS[key].features.multiCompany) {
+      assert(PLANS[key].limits.companies !== 1, `${key} advertises multiCompany but limits.companies is 1`)
+    }
+  }
 })
 
 test('unknown plan key falls back to Free rather than throwing', () => {
