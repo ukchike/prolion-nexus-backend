@@ -52,7 +52,7 @@ router.get('/billing/subscription', requireAuth, async (req, res) => {
 
     const { data: owner } = await supabaseAdmin.rpc('company_owner', { p_company: companyId })
     const { data: subscription } = await supabaseAdmin
-      .from('subscriptions')
+      .from('plan_subscriptions')
       .select('*')
       .eq('owner_user_id', owner)
       .maybeSingle()
@@ -178,7 +178,7 @@ router.post('/billing/webhook', async (req, res) => {
     } else if (event.event === 'subscription.disable' || event.event === 'subscription.not_renew') {
       const customerCode = event.data?.customer?.customer_code
       if (customerCode) {
-        await supabaseAdmin.from('subscriptions')
+        await supabaseAdmin.from('plan_subscriptions')
           .update({ cancel_at_period_end: true, updated_at: new Date().toISOString() })
           .eq('paystack_customer_code', customerCode)
       }
@@ -224,7 +224,7 @@ async function applySuccessfulPayment({ reference, providerData }) {
   if (periodLength.years) periodEnd.setFullYear(periodEnd.getFullYear() + periodLength.years)
   else periodEnd.setMonth(periodEnd.getMonth() + periodLength.months)
 
-  await supabaseAdmin.from('subscriptions').upsert({
+  await supabaseAdmin.from('plan_subscriptions').upsert({
     owner_user_id: txn.owner_user_id,
     plan_key: txn.plan_key,
     pending_plan_key: null,
@@ -249,12 +249,12 @@ router.post('/billing/change-plan', requireAuth, async (req, res) => {
 
     const supabaseAdmin = getAdminClient()
     const { data: subscription, error } = await supabaseAdmin
-      .from('subscriptions').select('*').eq('owner_user_id', req.user.id).maybeSingle()
+      .from('plan_subscriptions').select('*').eq('owner_user_id', req.user.id).maybeSingle()
     if (error) throw error
     if (!subscription) return res.status(404).json({ error: 'No active subscription found.' })
 
     if (planKey === subscription.plan_key) {
-      await supabaseAdmin.from('subscriptions')
+      await supabaseAdmin.from('plan_subscriptions')
         .update({ pending_plan_key: null, updated_at: new Date().toISOString() })
         .eq('owner_user_id', req.user.id)
       return res.json({ scheduled: false, message: 'Pending plan change cleared.' })
@@ -296,7 +296,7 @@ router.post('/billing/change-plan', requireAuth, async (req, res) => {
 
     // Scheduled, not immediate — the customer keeps what they paid for
     // until the period they already paid for ends.
-    await supabaseAdmin.from('subscriptions')
+    await supabaseAdmin.from('plan_subscriptions')
       .update({ pending_plan_key: planKey, updated_at: new Date().toISOString() })
       .eq('owner_user_id', req.user.id)
 
@@ -311,7 +311,7 @@ router.post('/billing/cancel', requireAuth, async (req, res) => {
   try {
     const supabaseAdmin = getAdminClient()
     const { data: subscription } = await supabaseAdmin
-      .from('subscriptions').select('*').eq('owner_user_id', req.user.id).maybeSingle()
+      .from('plan_subscriptions').select('*').eq('owner_user_id', req.user.id).maybeSingle()
     if (!subscription) return res.status(404).json({ error: 'No active subscription found.' })
 
     if (subscription.paystack_subscription_code) {
@@ -325,7 +325,7 @@ router.post('/billing/cancel', requireAuth, async (req, res) => {
       }
     }
 
-    await supabaseAdmin.from('subscriptions')
+    await supabaseAdmin.from('plan_subscriptions')
       .update({ cancel_at_period_end: true, updated_at: new Date().toISOString() })
       .eq('owner_user_id', req.user.id)
 
