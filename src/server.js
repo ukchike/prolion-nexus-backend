@@ -87,12 +87,22 @@ app.get('/health', (req, res) => {
     timestamp: new Date().toISOString(),
     config: {
       supabase: supabaseConfigured,
+      // The service-role key backs both team membership (routes/team.js)
+      // AND billing (entitlementService.js/routes/billing.js) — reported
+      // here for the same reason as every other key below: this exact
+      // gap is what shipped without it. "supabaseServiceKey: false" on a
+      // live deploy is the whole diagnosis for the "must be set to manage
+      // team membership" error surfacing under Billing.
+      supabaseServiceKey: !!process.env.SUPABASE_SERVICE_KEY,
       aiProvider: aiProviderName,
       aiProviderKey: aiProviderConfigured,
       // Same reason the keys above are reported: without this a deploy
       // missing RESEND_API_KEY looks healthy until someone tries to send
       // an invoice and gets a 503.
       email: isEmailConfigured(),
+      // Checkout/webhook/verify all throw immediately without this — see
+      // lib/paystack.js#getSecretKey.
+      paystack: !!process.env.PAYSTACK_SECRET_KEY,
     },
   })
 })
