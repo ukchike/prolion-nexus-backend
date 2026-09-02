@@ -12,6 +12,7 @@
 const express = require('express')
 const crypto = require('crypto')
 const { requireAuth } = require('../middleware/requireAuth')
+const { billingWriteLimiter } = require('../middleware/rateLimiters')
 const { getAdminClient } = require('../lib/supabaseAdmin')
 const { getPaymentProvider } = require('../lib/paymentProvider')
 const { PLANS, PUBLIC_PLAN_ORDER, VAT_RATE, amountInKoboWithVat } = require('../lib/entitlements')
@@ -81,7 +82,7 @@ router.get('/billing/subscription', requireAuth, async (req, res) => {
 })
 
 // ── Start (or upgrade) a subscription — always goes through a fresh checkout, since Paystack needs a charge for the new amount. ──
-router.post('/billing/checkout', requireAuth, async (req, res) => {
+router.post('/billing/checkout', requireAuth, billingWriteLimiter, async (req, res) => {
   try {
     const { planKey, billingCycle, companyId } = req.body || {}
     if (!PLANS[planKey] || planKey === 'free' || planKey === 'legacy') {
@@ -131,6 +132,26 @@ router.get('/billing/verify', requireAuth, async (req, res) => {
   try {
     const { reference } = req.query
     if (!reference) return res.status(400).json({ error: 'reference is required.' })
+
+    // Confirms the reference is THIS caller's own checkout before touching
+    // anything. Without this, any signed-in account could call /verify
+    // with a guessed or leaked reference belonging to someone else and
+    // trigger that OTHER person's subscription activation early — not a
+    // way to steal a plan (applySuccessfulPayment always applies the
+    // owner_user_id recorded on the transaction, never req.user.id), but
+    // a real authorization gap regardless: this route should only ever
+    // act on the caller's own resource, the same discipline
+    // assertCompanyMembership enforces everywhere else in this file.
+    const supabaseAdmin = getAdminClient()
+    const { data: txn } = await supabaseAdmin
+      .from('billing_transactions')
+      .select('owner_user_id')
+      .eq('provider', 'paystack').eq('reference', reference)
+      .maybeSingle()
+    if (!txn || txn.owner_user_id !== req.user.id) {
+      return res.status(404).json({ error: 'No checkout found for that reference.' })
+    }
+
     const provider = getPaymentProvider()
     const data = await provider.verifyPayment(reference)
     if (data.status !== 'success') {
@@ -242,10 +263,17 @@ async function applySuccessfulPayment({ reference, providerData }) {
 }
 
 // ── Downgrade (scheduled for next renewal) or clear a pending downgrade. Upgrades go through /checkout instead — see isDowngrade(). ──
-router.post('/billing/change-plan', requireAuth, async (req, res) => {
+router.post('/billing/change-plan', requireAuth, billingWriteLimiter, async (req, res) => {
   try {
     const { planKey } = req.body || {}
-    if (!PLANS[planKey]) return res.status(400).json({ error: 'Unknown plan.' })
+    // legacy is never a customer-selectable target — it's the internal
+    // grandfather plan backfilled by the 048 migration, not something
+    // sold through checkout or change-plan. Today's downgrade math
+    // happens to reject it anyway (legacy's sortOrder outranks every real
+    // plan, so isDowngrade() returns false and it falls into the "not a
+    // downgrade" 400 below) — that's an accident of the number chosen,
+    // not a guarantee, so it's rejected explicitly here too.
+    if (!PLANS[planKey] || planKey === 'legacy') return res.status(400).json({ error: 'Unknown plan.' })
 
     const supabaseAdmin = getAdminClient()
     const { data: subscription, error } = await supabaseAdmin
