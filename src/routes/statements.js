@@ -11,6 +11,7 @@ const UNVERIFIED_PARSERS = new Set(['gtb'])
 const { requireAuth } = require('../middleware/requireAuth')
 const { parseLimiter } = require('../middleware/rateLimiters')
 const { matchesClaimedType } = require('../lib/fileSignature')
+const { assertCompanyMembership, assertStatementUploadAllowed, EntitlementError } = require('../lib/entitlementService')
 
 const router = express.Router()
 
@@ -68,6 +69,21 @@ router.post('/parse-statement', requireAuth, parseLimiter, upload.single('file')
       })
     }
 
+    // companyId is optional for backward compatibility with a frontend
+    // build that predates this check, but a real client always sends it —
+    // without it, this fails OPEN (no pre-flight check) rather than
+    // blocking every upload while the two deployments settle. The
+    // authoritative cap is still the database trigger on the bank_statements
+    // insert the frontend does after this call returns; this is only the
+    // fail-fast half so a user isn't asked to wait through a parse of a
+    // 10MB PDF just to be told at save time that the month's quota was
+    // already spent.
+    const companyId = typeof req.body.companyId === 'string' ? req.body.companyId : null
+    if (companyId) {
+      await assertCompanyMembership(req.user.id, companyId)
+      await assertStatementUploadAllowed(companyId)
+    }
+
     const result = await parseStatement({ buffer: req.file.buffer, fileType, bankCode })
 
     return res.json({
@@ -82,6 +98,9 @@ router.post('/parse-statement', requireAuth, parseLimiter, upload.single('file')
       rawTextPreview: result.rawTextPreview,
     })
   } catch (err) {
+    if (err instanceof EntitlementError) {
+      return res.status(err.status).json({ error: err.message, upgradeMetric: err.upgradeMetric })
+    }
     console.error('Parse error:', err)
     return res.status(500).json({ error: err.message || 'Failed to parse statement.' })
   }

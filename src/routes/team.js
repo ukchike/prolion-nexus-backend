@@ -12,8 +12,6 @@
 const express = require('express')
 const { requireAuth } = require('../middleware/requireAuth')
 const { getAdminClient } = require('../lib/supabaseAdmin')
-const { seatLimitForTier } = require('../lib/seatLimits')
-
 const { generatePassword } = require('../lib/generatedPassword')
 
 const router = express.Router()
@@ -145,24 +143,24 @@ router.post('/team/invite', requireAuth, async (req, res) => {
     // limit never gets an email sent that it can't honour. Pending invites
     // count against the cap — they've effectively claimed their seat, and
     // ignoring them would let several invites go out at once and overshoot
-    // the limit as they're accepted.
-    const { data: company, error: companyError } = await supabaseAdmin
-      .from('company_profiles')
-      .select('complexity_level')
-      .eq('id', membership.company_id)
-      .maybeSingle()
-    if (companyError) throw companyError
-
-    const seatLimit = seatLimitForTier(company?.complexity_level)
+    // the limit as they're accepted. This is a pre-check for a clean error
+    // message; the real backstop is the enforce_user_limit trigger on
+    // company_members itself (048_billing_and_entitlements.sql), which
+    // fires regardless of what route inserted the row.
+    const { data: seatLimit, error: seatLimitError } = await supabaseAdmin
+      .rpc('plan_limit', { p_company: membership.company_id, p_metric: 'users' })
+    if (seatLimitError) throw seatLimitError
     if (seatLimit !== null) {
       const { count, error: countError } = await supabaseAdmin
         .from('company_members')
         .select('id', { count: 'exact', head: true })
         .eq('company_id', membership.company_id)
+        .eq('status', 'active')
       if (countError) throw countError
       if ((count || 0) >= seatLimit) {
-        return res.status(403).json({
-          error: `Your plan includes ${seatLimit} team member${seatLimit === 1 ? '' : 's'}. Upgrade your plan in Settings to invite more.`,
+        return res.status(402).json({
+          error: `Your plan includes ${seatLimit} team member${seatLimit === 1 ? '' : 's'}. Upgrade your plan in Settings → Billing to invite more.`,
+          upgradeMetric: 'users',
         })
       }
     }
